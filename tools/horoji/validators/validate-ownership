@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+"""Validate authoritative ownership mappings."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+
+from _validator_common import (
+    compute_repo_root,
+    emit_yaml,
+    is_valid_identifier,
+    load_json,
+    load_yaml,
+    make_result,
+    memory_root,
+    normalize_path,
+    validate_against_schema,
+    yaml_files_in,
+)
+
+VALIDATOR = "validate-ownership"
+
+
+def _pattern_overlap(p1: str, p2: str) -> bool:
+    if p1 == p2:
+        return True
+
+    def _prefix(pattern: str) -> str | None:
+        if pattern.endswith("/**"):
+            return pattern[:-2]
+        return None
+
+    p1_prefix = _prefix(p1)
+    p2_prefix = _prefix(p2)
+
+    if p1_prefix and p2.startswith(p1_prefix):
+        return True
+    if p2_prefix and p1.startswith(p2_prefix):
+        return True
+
+    return False
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Validate Horoji ownership")
+    parser.add_argument("--repo-root", help="Repository root override")
+    args = parser.parse_args()
+
+    repo_root = compute_repo_root(__file__, args.repo_root)
+    mem_root = memory_root(repo_root)
+    ownership_dir = os.path.join(mem_root, "authoritative", "ownership")
+    contracts_dir = os.path.join(mem_root, "authoritative", "contracts")
+    schema_file = os.path.join(mem_root, "schemas", "ownership.schema.json")
+
+    try:
+        schema = load_json(schema_file)
+    except Exception as exc:
+        emit_yaml(
+            make_result(
+                VALIDATOR,
+                "ERROR",
+                normalize_path(schema_file, repo_root),
+                "configuration_error",
+                [str(exc)],
+            )
+        )
+        sys.exit(1)
+
+    known_owners: set[str] = set()
+    for contract_file in yaml_files_in(contracts_dir):
+        try:
+            contract_data = load_yaml(contract_file)
+        except Exception:
+            continue
+        if isinstance(contract_data, dict) and isinstance(contract_data.get("subsystem"), str):
+            known_owners.add(contract_data["subsystem"])
+
+    ownership_files = yaml_files_in(ownership_dir)
+    if not ownership_files:
+        emit_yaml(
+            make_result(
+                VALIDATOR,
+                "FAIL",
+                normalize_path(ownership_dir, repo_root),
+                "no_ownership_files",
+            )
+        )
+        sys.exit(1)
+
+    records: list[tuple[str, str, str]] = []
+    seen_patterns: dict[str, str] = {}
+
+    for path in ownership_files:
+        target = normalize_path(path, repo_root)
+        try:
+            data = load_yaml(path)
+        except Exception as exc:
+            emit_yaml(make_result(VALIDATOR, "ERROR", target, "parse_error", [str(exc)]))
+            sys.exit(1)
+
+        if not isinstance(data, dict):
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "ownership_not_mapping"))
+            sys.exit(1)
+
+        schema_errors = validate_against_schema(data, schema)
+        if schema_errors:
+            emit_yaml(
+                make_result(VALIDATOR, "FAIL", target, "schema_validation_failed", schema_errors)
+            )
+            sys.exit(1)
+
+        pattern = data.get("pattern", "")
+        owner = data.get("owner", "")
+
+        if not isinstance(pattern, str) or pattern.strip() == "":
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "empty_pattern"))
+            sys.exit(1)
+        if not isinstance(owner, str) or owner.strip() == "":
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "empty_owner"))
+            sys.exit(1)
+        if not is_valid_identifier(owner):
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "invalid_owner_identifier"))
+            sys.exit(1)
+
+        if known_owners and owner not in known_owners:
+            emit_yaml(
+                make_result(
+                    VALIDATOR,
+                    "FAIL",
+                    target,
+                    "unknown_owner_subsystem",
+                    [owner],
+                )
+            )
+            sys.exit(1)
+
+        review_required = data.get("review_required")
+        if review_required is not None:
+            if not isinstance(review_required, list):
+                emit_yaml(make_result(VALIDATOR, "FAIL", target, "review_required_not_list"))
+                sys.exit(1)
+            for reviewer in review_required:
+                if not isinstance(reviewer, str) or reviewer.strip() == "":
+                    emit_yaml(make_result(VALIDATOR, "FAIL", target, "invalid_review_authority"))
+                    sys.exit(1)
+
+        if pattern in seen_patterns and seen_patterns[pattern] != owner:
+            emit_yaml(
+                make_result(
+                    VALIDATOR,
+                    "FAIL",
+                    target,
+                    "conflicting_duplicate_pattern",
+                    [pattern, seen_patterns[pattern], owner],
+                )
+            )
+            sys.exit(1)
+        seen_patterns[pattern] = owner
+        records.append((target, pattern, owner))
+
+    for i in range(len(records)):
+        target_a, pattern_a, owner_a = records[i]
+        for j in range(i + 1, len(records)):
+            target_b, pattern_b, owner_b = records[j]
+            if owner_a == owner_b:
+                continue
+            if _pattern_overlap(pattern_a, pattern_b):
+                emit_yaml(
+                    make_result(
+                        VALIDATOR,
+                        "FAIL",
+                        f"{target_a}::{target_b}",
+                        "overlapping_ownership_conflict",
+                        [pattern_a, pattern_b, owner_a, owner_b],
+                    )
+                )
+                sys.exit(1)
+
+    emit_yaml(
+        make_result(
+            VALIDATOR,
+            "PASS",
+            ".project_memory/authoritative/ownership",
+            "all_ownership_records_valid",
+            [f"count={len(ownership_files)}"],
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()

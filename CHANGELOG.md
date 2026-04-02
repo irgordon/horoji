@@ -8,6 +8,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — TASK_04: Deterministic Validators (Phase 4)
+
+- Added deterministic validator entrypoints under `tools/horoji/validators/`:
+  - `validate-contracts`
+  - `validate-invariants`
+  - `validate-ownership`
+  - `validate-provenance`
+  - `validate-scheduler_non_blocking`
+  - `validate-all`
+- Implemented bounded validator responsibilities with explicit pass/fail/error YAML output:
+  - contract schema + structural checks (including disjoint dependency sets)
+  - invariant schema + structural checks (including duplicate invariant IDs)
+  - ownership schema + conflict checks (including overlapping conflicting ownership)
+  - derived artifact provenance presence/schema checks and structural parseability
+  - repository-backed invariant enforcement for `scheduler_non_blocking`
+- Added authoritative invariant artifact:
+  - `.project_memory/authoritative/invariants/scheduler_non_blocking.yaml`
+- Added validator tests in `tests/horoji/test_validators.py` covering:
+  - required validator entrypoint existence/readability
+  - success on valid repository state
+  - required malformed/conflict negative cases
+  - deterministic ordering and repeatability for `validate-all`
+  - machine-readable output shape validation
+
 ### Added — TASK_03: Deterministic Invalidation Engine (Phase 3)
 
 - Created invalidation engine entrypoint at `tools/horoji/invalidation/horoji-invalidate`

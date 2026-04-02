@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""Validate authoritative invariants."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+
+from _validator_common import (
+    compute_repo_root,
+    emit_yaml,
+    is_valid_identifier,
+    load_json,
+    load_yaml,
+    make_result,
+    memory_root,
+    normalize_path,
+    validate_against_schema,
+    yaml_files_in,
+)
+
+VALIDATOR = "validate-invariants"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Validate Horoji invariants")
+    parser.add_argument("--repo-root", help="Repository root override")
+    args = parser.parse_args()
+
+    repo_root = compute_repo_root(__file__, args.repo_root)
+    mem_root = memory_root(repo_root)
+    invariants_dir = os.path.join(mem_root, "authoritative", "invariants")
+    schema_file = os.path.join(mem_root, "schemas", "invariant.schema.json")
+
+    try:
+        schema = load_json(schema_file)
+    except Exception as exc:
+        emit_yaml(
+            make_result(
+                VALIDATOR,
+                "ERROR",
+                normalize_path(schema_file, repo_root),
+                "configuration_error",
+                [str(exc)],
+            )
+        )
+        sys.exit(1)
+
+    invariant_files = yaml_files_in(invariants_dir)
+    if not invariant_files:
+        emit_yaml(
+            make_result(
+                VALIDATOR,
+                "FAIL",
+                normalize_path(invariants_dir, repo_root),
+                "no_invariant_files",
+            )
+        )
+        sys.exit(1)
+
+    seen_ids: dict[str, str] = {}
+
+    for path in invariant_files:
+        target = normalize_path(path, repo_root)
+        try:
+            data = load_yaml(path)
+        except Exception as exc:
+            emit_yaml(make_result(VALIDATOR, "ERROR", target, "parse_error", [str(exc)]))
+            sys.exit(1)
+
+        if not isinstance(data, dict):
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "invariant_not_mapping"))
+            sys.exit(1)
+
+        schema_errors = validate_against_schema(data, schema)
+        if schema_errors:
+            emit_yaml(
+                make_result(VALIDATOR, "FAIL", target, "schema_validation_failed", schema_errors)
+            )
+            sys.exit(1)
+
+        invariant_id = data.get("id", "")
+        if not isinstance(invariant_id, str) or invariant_id.strip() == "":
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "empty_invariant_id"))
+            sys.exit(1)
+        if not is_valid_identifier(invariant_id):
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "invalid_invariant_id", [invariant_id]))
+            sys.exit(1)
+
+        if invariant_id in seen_ids:
+            emit_yaml(
+                make_result(
+                    VALIDATOR,
+                    "FAIL",
+                    target,
+                    "duplicate_invariant_id",
+                    [seen_ids[invariant_id], target],
+                )
+            )
+            sys.exit(1)
+        seen_ids[invariant_id] = target
+
+        description = data.get("description", "")
+        if not isinstance(description, str) or description.strip() == "":
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "empty_description"))
+            sys.exit(1)
+
+        subsystem = data.get("subsystem", "")
+        if not isinstance(subsystem, str) or subsystem.strip() == "":
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "empty_subsystem"))
+            sys.exit(1)
+        if not is_valid_identifier(subsystem):
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "invalid_subsystem_identifier"))
+            sys.exit(1)
+
+        enforcement = data.get("enforcement")
+        if not isinstance(enforcement, dict) or not enforcement:
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "invalid_enforcement_structure"))
+            sys.exit(1)
+
+        if "ast_query" in enforcement:
+            ast_query = enforcement["ast_query"]
+            if not isinstance(ast_query, dict):
+                emit_yaml(make_result(VALIDATOR, "FAIL", target, "invalid_ast_query_structure"))
+                sys.exit(1)
+            forbidden_calls = ast_query.get("forbidden_calls", [])
+            if not isinstance(forbidden_calls, list):
+                emit_yaml(make_result(VALIDATOR, "FAIL", target, "forbidden_calls_not_list"))
+                sys.exit(1)
+            for symbol in forbidden_calls:
+                if not isinstance(symbol, str) or symbol.strip() == "":
+                    emit_yaml(make_result(VALIDATOR, "FAIL", target, "invalid_forbidden_call_symbol"))
+                    sys.exit(1)
+
+    emit_yaml(
+        make_result(
+            VALIDATOR,
+            "PASS",
+            ".project_memory/authoritative/invariants",
+            "all_invariants_valid",
+            [f"count={len(invariant_files)}"],
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()
