@@ -31,6 +31,19 @@ def run_invalidator(*extra_args: str) -> subprocess.CompletedProcess:
     )
 
 
+def run_invalidator_with_env(
+    extra_env: dict[str, str], *extra_args: str
+) -> subprocess.CompletedProcess:
+    env = os.environ.copy()
+    env.update(extra_env)
+    return subprocess.run(
+        [sys.executable, invalidation_path("horoji-invalidate"), *extra_args],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+
 def parse_yaml_output(raw: str) -> dict:
     data = yaml.safe_load(raw)
     assert isinstance(data, dict), f"Output did not parse to a mapping:\n{raw}"
@@ -152,31 +165,11 @@ def test_fails_when_changed_files_input_is_missing():
 
 
 def test_fails_when_rules_file_is_missing(tmp_path):
-    runner = tmp_path / "run_missing_rules.py"
-    runner.write_text(
-        textwrap.dedent(
-            f"""\
-            import importlib.util
-            import sys
-
-            spec = importlib.util.spec_from_file_location(
-                "invalidate_mod",
-                {repr(invalidation_path("horoji-invalidate"))},
-            )
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)
-            mod.RULES_FILE = {repr(str(tmp_path / "missing.yaml"))}
-            sys.argv = [
-                "horoji-invalidate",
-                "--changed-file",
-                "include/scheduler.h",
-            ]
-            mod.main()
-            """
-        ),
-        encoding="utf-8",
+    result = run_invalidator_with_env(
+        {"HOROJI_INVALIDATION_RULES_FILE": str(tmp_path / "missing.yaml")},
+        "--changed-file",
+        "include/scheduler.h",
     )
-    result = subprocess.run([sys.executable, str(runner)], capture_output=True, text=True)
     assert result.returncode != 0
     assert "configuration_error" in result.stderr
 
@@ -185,31 +178,11 @@ def test_fails_when_rules_file_is_malformed(tmp_path):
     bad_rules = tmp_path / "bad_rules.yaml"
     bad_rules.write_text("rules: [unclosed\n", encoding="utf-8")
 
-    runner = tmp_path / "run_bad_rules.py"
-    runner.write_text(
-        textwrap.dedent(
-            f"""\
-            import importlib.util
-            import sys
-
-            spec = importlib.util.spec_from_file_location(
-                "invalidate_mod",
-                {repr(invalidation_path("horoji-invalidate"))},
-            )
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)
-            mod.RULES_FILE = {repr(str(bad_rules))}
-            sys.argv = [
-                "horoji-invalidate",
-                "--changed-file",
-                "include/scheduler.h",
-            ]
-            mod.main()
-            """
-        ),
-        encoding="utf-8",
+    result = run_invalidator_with_env(
+        {"HOROJI_INVALIDATION_RULES_FILE": str(bad_rules)},
+        "--changed-file",
+        "include/scheduler.h",
     )
-    result = subprocess.run([sys.executable, str(runner)], capture_output=True, text=True)
     assert result.returncode != 0
     assert "configuration_error" in result.stderr
 
@@ -229,31 +202,10 @@ def test_fails_when_rule_structure_is_invalid(tmp_path):
         encoding="utf-8",
     )
 
-    runner = tmp_path / "run_bad_structure.py"
-    runner.write_text(
-        textwrap.dedent(
-            f"""\
-            import importlib.util
-            import sys
-
-            spec = importlib.util.spec_from_file_location(
-                "invalidate_mod",
-                {repr(invalidation_path("horoji-invalidate"))},
-            )
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)
-            mod.RULES_FILE = {repr(str(bad_rules))}
-            sys.argv = [
-                "horoji-invalidate",
-                "--changed-file",
-                "include/scheduler.h",
-            ]
-            mod.main()
-            """
-        ),
-        encoding="utf-8",
+    result = run_invalidator_with_env(
+        {"HOROJI_INVALIDATION_RULES_FILE": str(bad_rules)},
+        "--changed-file",
+        "include/scheduler.h",
     )
-    result = subprocess.run([sys.executable, str(runner)], capture_output=True, text=True)
     assert result.returncode != 0
     assert "configuration_error" in result.stderr
-
