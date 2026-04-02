@@ -1,0 +1,62 @@
+name: horoji-ci
+
+"on":
+  pull_request:
+
+jobs:
+  horoji-enforcement:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Horoji test dependencies
+        run: python -m pip install pytest pyyaml
+
+      - name: Resolve changed files
+        id: changed
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib
+          import subprocess
+
+          base = "${{ github.event.pull_request.base.sha }}"
+          head = "${{ github.event.pull_request.head.sha }}"
+          result = subprocess.run(
+              ["git", "diff", "--name-only", "--diff-filter=ACMR", base, head],
+              check=True,
+              capture_output=True,
+              text=True,
+          )
+          changed = sorted({line.strip().replace("\\\\", "/") for line in result.stdout.splitlines() if line.strip()})
+          if not changed:
+              raise SystemExit("No changed files resolved for pull request")
+
+          output_path = pathlib.Path("/tmp/horoji_changed_files.txt")
+          output_path.write_text("\n".join(changed) + "\n", encoding="utf-8")
+          print(f"changed_count={len(changed)}")
+          print(f"changed_file_list={output_path}")
+          PY
+
+      - name: Run canonical Horoji CI entrypoint
+        run: |
+          set -euo pipefail
+          python tools/horoji/cli/horoji-check \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --changed-files-file /tmp/horoji_changed_files.txt \
+            --base-sha "${{ github.event.pull_request.base.sha }}" \
+            --head-sha "${{ github.event.pull_request.head.sha }}" \
+            --derived-policy committed
+
+      - name: Run Horoji test suite
+        run: python -m pytest tests/horoji/ -v

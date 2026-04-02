@@ -1,0 +1,421 @@
+#!/usr/bin/env python3
+"""Canonical deterministic Horoji CI enforcement entrypoint (TASK_05)."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from typing import Any
+
+import yaml
+
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
+REQUIRED_DIRECTORIES = [
+    ".project_memory/authoritative/contracts",
+    ".project_memory/authoritative/invariants",
+    ".project_memory/authoritative/ownership",
+    ".project_memory/authoritative/architecture_manifest",
+    ".project_memory/derived/callgraphs",
+    ".project_memory/derived/dependencies",
+    ".project_memory/derived/impact_sets",
+    ".project_memory/schemas",
+    ".project_memory/config",
+]
+
+REQUIRED_SCHEMA_FILES = [
+    ".project_memory/schemas/contract.schema.json",
+    ".project_memory/schemas/invariant.schema.json",
+    ".project_memory/schemas/ownership.schema.json",
+    ".project_memory/schemas/provenance.schema.json",
+    ".project_memory/schemas/callgraph.schema.json",
+    ".project_memory/schemas/dependency.schema.json",
+    ".project_memory/schemas/impact_set.schema.json",
+]
+
+REQUIRED_CONFIG_FILES = [
+    ".project_memory/config/horoji.config.yaml",
+    ".project_memory/config/invalidation_rules.yaml",
+]
+
+STAGE_ORDER = [
+    "bootstrap_presence",
+    "bootstrap_parseability",
+    "changed_files",
+    "invalidation",
+    "regeneration",
+    "validate_authoritative",
+    "validate_derived",
+    "validate_repository_invariants",
+    "stale_artifact_check",
+    "result",
+]
+
+
+class StageFailure(Exception):
+    def __init__(self, stage: str, reason: str, details: list[str] | None = None):
+        self.stage = stage
+        self.reason = reason
+        self.details = details or []
+        super().__init__(f"{stage}: {reason}")
+
+
+def emit_stage(stage: str, status: str, reason: str, details: list[str] | None = None) -> dict[str, Any]:
+    payload = {
+        "stage": stage,
+        "status": status,
+        "reason": reason,
+        "details": details or [],
+    }
+    sys.stdout.write("---\n")
+    yaml.safe_dump(payload, sys.stdout, sort_keys=True)
+    sys.stdout.flush()
+    return payload
+
+
+def _run_command(args: list[str], *, cwd: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(args, cwd=cwd, env=env, capture_output=True, text=True)
+
+
+def _normalize_changed_files(paths: list[str]) -> list[str]:
+    normalized = []
+    for path in paths:
+        cleaned = path.strip()
+        if cleaned:
+            normalized.append(cleaned.replace("\\", "/"))
+    return sorted(set(normalized))
+
+
+def _resolve_deterministic_generated_at(repo_root: str) -> str:
+    result = _run_command(
+        ["git", "-C", repo_root, "show", "-s", "--format=%cI", "HEAD"], cwd=repo_root
+    )
+    if result.returncode == 0 and result.stdout.strip():
+        return result.stdout.strip()
+    return "1970-01-01T00:00:00Z"
+
+
+def _resolve_deterministic_input_commit(repo_root: str) -> str:
+    result = _run_command(["git", "-C", repo_root, "rev-parse", "HEAD"], cwd=repo_root)
+    if result.returncode == 0 and result.stdout.strip():
+        return result.stdout.strip()
+    return "0000000000000000000000000000000000000000"
+
+
+def _check_bootstrap_presence(repo_root: str) -> list[str]:
+    missing = []
+    for rel_path in REQUIRED_DIRECTORIES + REQUIRED_SCHEMA_FILES + REQUIRED_CONFIG_FILES:
+        path = os.path.join(repo_root, rel_path)
+        if rel_path in REQUIRED_DIRECTORIES:
+            if not os.path.isdir(path):
+                missing.append(rel_path)
+        elif not os.path.isfile(path):
+            missing.append(rel_path)
+    return sorted(missing)
+
+
+def _check_parseability(repo_root: str) -> list[str]:
+    malformed: list[str] = []
+    for rel_path in REQUIRED_SCHEMA_FILES:
+        path = os.path.join(repo_root, rel_path)
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            if not isinstance(data, dict):
+                malformed.append(f"{rel_path}: schema_root_not_mapping")
+        except (OSError, json.JSONDecodeError) as exc:
+            malformed.append(f"{rel_path}: {exc}")
+
+    for rel_path in REQUIRED_CONFIG_FILES:
+        path = os.path.join(repo_root, rel_path)
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                data = yaml.safe_load(fh)
+            if not isinstance(data, dict):
+                malformed.append(f"{rel_path}: config_root_not_mapping")
+        except (OSError, yaml.YAMLError) as exc:
+            malformed.append(f"{rel_path}: {exc}")
+
+    return sorted(malformed)
+
+
+def _compute_changed_files(args: argparse.Namespace, repo_root: str) -> list[str]:
+    changed_files: list[str] = list(args.changed_file)
+
+    if args.changed_files_file:
+        if not os.path.isfile(args.changed_files_file):
+            raise StageFailure("changed_files", "changed_files_file_missing", [args.changed_files_file])
+        with open(args.changed_files_file, "r", encoding="utf-8") as fh:
+            changed_files.extend(line.rstrip("\n") for line in fh)
+
+    if not changed_files and args.base_sha and args.head_sha:
+        result = _run_command(
+            [
+                "git",
+                "-C",
+                repo_root,
+                "diff",
+                "--name-only",
+                "--diff-filter=ACMR",
+                args.base_sha,
+                args.head_sha,
+            ],
+            cwd=repo_root,
+        )
+        if result.returncode != 0:
+            raise StageFailure("changed_files", "git_diff_failed", [result.stderr.strip()])
+        changed_files.extend(result.stdout.splitlines())
+
+    if not changed_files and args.auto_diff:
+        result = _run_command(
+            [
+                "git",
+                "-C",
+                repo_root,
+                "diff",
+                "--name-only",
+                "--diff-filter=ACMR",
+                "HEAD~1",
+                "HEAD",
+            ],
+            cwd=repo_root,
+        )
+        if result.returncode != 0:
+            raise StageFailure("changed_files", "git_auto_diff_failed", [result.stderr.strip()])
+        changed_files.extend(result.stdout.splitlines())
+
+    normalized = _normalize_changed_files(changed_files)
+    if not normalized:
+        raise StageFailure("changed_files", "changed_files_unavailable")
+    return normalized
+
+
+def _run_invalidation(repo_root: str, changed_files: list[str], env: dict[str, str]) -> tuple[dict[str, Any], list[str]]:
+    invalidation_script = os.path.join(repo_root, "tools", "horoji", "invalidation", "horoji-invalidate")
+    cmd = [sys.executable, invalidation_script]
+    for path in changed_files:
+        cmd.extend(["--changed-file", path])
+
+    result = _run_command(cmd, cwd=repo_root, env=env)
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        raise StageFailure("invalidation", "invalidation_failed", [detail])
+
+    try:
+        payload = yaml.safe_load(result.stdout)
+    except yaml.YAMLError as exc:
+        raise StageFailure("invalidation", "invalidation_output_malformed", [str(exc)]) from exc
+
+    if not isinstance(payload, dict) or not isinstance(payload.get("invalidation_result"), dict):
+        raise StageFailure("invalidation", "invalidation_output_missing_result")
+
+    invalidation_result = payload["invalidation_result"]
+    affected_artifacts = invalidation_result.get("affected_artifacts", [])
+    if not isinstance(affected_artifacts, list) or not all(isinstance(item, str) for item in affected_artifacts):
+        raise StageFailure("invalidation", "invalid_affected_artifacts")
+
+    return invalidation_result, sorted(set(affected_artifacts))
+
+
+def _run_generator(repo_root: str, script_name: str, extra_args: list[str], env: dict[str, str]) -> None:
+    script = os.path.join(repo_root, "tools", "horoji", "generators", script_name)
+    result = _run_command([sys.executable, script, *extra_args], cwd=repo_root, env=env)
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        raise StageFailure("regeneration", f"generator_failed:{script_name}", [detail])
+
+
+def _regenerate(repo_root: str, affected_artifacts: list[str], changed_files: list[str], env: dict[str, str]) -> list[str]:
+    invoked: list[str] = []
+
+    if "callgraphs" in affected_artifacts:
+        _run_generator(repo_root, "horoji-callgraph", [], env)
+        invoked.append("horoji-callgraph")
+
+    if "dependencies" in affected_artifacts:
+        _run_generator(repo_root, "horoji-deps", [], env)
+        invoked.append("horoji-deps")
+
+    if "impact_sets" in affected_artifacts:
+        args: list[str] = []
+        for path in changed_files:
+            args.extend(["--file", path])
+        _run_generator(repo_root, "horoji-impact", args, env)
+        invoked.append("horoji-impact")
+
+    if not invoked:
+        raise StageFailure("regeneration", "no_generators_selected")
+
+    return invoked
+
+
+def _run_validator(repo_root: str, validator_name: str) -> dict[str, Any]:
+    script = os.path.join(repo_root, "tools", "horoji", "validators", validator_name)
+    result = _run_command([sys.executable, script, "--repo-root", repo_root], cwd=repo_root)
+
+    out = (result.stdout or "").strip() or (result.stderr or "").strip()
+    try:
+        payload = yaml.safe_load(out) if out else None
+    except yaml.YAMLError:
+        payload = None
+
+    if not isinstance(payload, dict):
+        raise StageFailure(
+            "validate_authoritative",
+            "validator_unstructured_output",
+            [validator_name, out[:300]],
+        )
+
+    status = str(payload.get("status", "ERROR"))
+    if result.returncode != 0 or status in {"FAIL", "ERROR"}:
+        reason = str(payload.get("reason", "validator_failed"))
+        raise StageFailure("validate_authoritative", f"{validator_name}:{reason}", [out[:300]])
+
+    return payload
+
+
+def _run_stage_validators(repo_root: str, validator_names: list[str], stage: str) -> list[str]:
+    reasons: list[str] = []
+    for validator in validator_names:
+        script = os.path.join(repo_root, "tools", "horoji", "validators", validator)
+        result = _run_command([sys.executable, script, "--repo-root", repo_root], cwd=repo_root)
+
+        out = (result.stdout or "").strip() or (result.stderr or "").strip()
+        try:
+            payload = yaml.safe_load(out) if out else None
+        except yaml.YAMLError as exc:
+            raise StageFailure(stage, f"{validator}:unstructured_output", [str(exc), out[:300]]) from exc
+
+        if not isinstance(payload, dict):
+            raise StageFailure(stage, f"{validator}:non_mapping_output", [out[:300]])
+
+        status = str(payload.get("status", "ERROR"))
+        if result.returncode != 0 or status in {"FAIL", "ERROR"}:
+            reason = str(payload.get("reason", "validator_failed"))
+            raise StageFailure(stage, f"{validator}:{reason}", [out[:300]])
+        reasons.append(f"{validator}:PASS")
+
+    return reasons
+
+
+def _check_stale_derived(repo_root: str, policy: str) -> list[str]:
+    if policy == "non_committed":
+        return ["policy=non_committed"]
+
+    result = _run_command(
+        ["git", "-C", repo_root, "status", "--porcelain", "--", ".project_memory/derived"],
+        cwd=repo_root,
+    )
+    if result.returncode != 0:
+        raise StageFailure("stale_artifact_check", "git_status_failed", [result.stderr.strip()])
+
+    changed = sorted(line.strip() for line in result.stdout.splitlines() if line.strip())
+    if changed:
+        raise StageFailure("stale_artifact_check", "stale_derived_artifacts_detected", changed)
+
+    return ["policy=committed", "derived_tree_clean"]
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run deterministic Horoji CI enforcement checks")
+    parser.add_argument("--repo-root", default=REPO_ROOT, help="Repository root path")
+    parser.add_argument("--changed-file", action="append", default=[], help="Changed file path (repeatable)")
+    parser.add_argument("--changed-files-file", help="File containing changed paths (one per line)")
+    parser.add_argument("--base-sha", help="Base commit SHA for changed file computation")
+    parser.add_argument("--head-sha", help="Head commit SHA for changed file computation")
+    parser.add_argument(
+        "--auto-diff",
+        action="store_true",
+        help="Compute changed files via git diff HEAD~1..HEAD if inputs are not provided",
+    )
+    parser.add_argument(
+        "--derived-policy",
+        choices=["committed", "non_committed"],
+        default="committed",
+        help="Stale-check policy for derived artifacts",
+    )
+    return parser
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    repo_root = os.path.abspath(args.repo_root)
+
+    env = os.environ.copy()
+    env.setdefault("HOROJI_GENERATED_AT", _resolve_deterministic_generated_at(repo_root))
+    env.setdefault("HOROJI_INPUT_COMMIT", _resolve_deterministic_input_commit(repo_root))
+
+    stage_results: list[dict[str, Any]] = []
+    changed_files: list[str] = []
+    affected_artifacts: list[str] = []
+
+    try:
+        missing = _check_bootstrap_presence(repo_root)
+        if missing:
+            raise StageFailure("bootstrap_presence", "missing_bootstrap_anchor", missing)
+        stage_results.append(emit_stage("bootstrap_presence", "PASS", "required_bootstrap_present"))
+
+        malformed = _check_parseability(repo_root)
+        if malformed:
+            raise StageFailure("bootstrap_parseability", "malformed_bootstrap_anchor", malformed)
+        stage_results.append(emit_stage("bootstrap_parseability", "PASS", "bootstrap_parseable"))
+
+        changed_files = _compute_changed_files(args, repo_root)
+        stage_results.append(
+            emit_stage("changed_files", "PASS", "changed_files_resolved", [f"count={len(changed_files)}", *changed_files])
+        )
+
+        invalidation_result, affected_artifacts = _run_invalidation(repo_root, changed_files, env)
+        stage_results.append(
+            emit_stage(
+                "invalidation",
+                "PASS",
+                str(invalidation_result.get("scope", "scope_unknown")),
+                [
+                    f"affected_artifacts={','.join(affected_artifacts)}",
+                    f"reason={','.join(invalidation_result.get('reason', []))}",
+                ],
+            )
+        )
+
+        invoked = _regenerate(repo_root, affected_artifacts, changed_files, env)
+        stage_results.append(
+            emit_stage("regeneration", "PASS", "required_regeneration_completed", invoked)
+        )
+
+        auth_reasons = _run_stage_validators(
+            repo_root,
+            ["validate-contracts", "validate-invariants", "validate-ownership"],
+            "validate_authoritative",
+        )
+        stage_results.append(emit_stage("validate_authoritative", "PASS", "authoritative_valid", auth_reasons))
+
+        derived_reasons = _run_stage_validators(repo_root, ["validate-provenance"], "validate_derived")
+        stage_results.append(emit_stage("validate_derived", "PASS", "derived_valid", derived_reasons))
+
+        invariant_reasons = _run_stage_validators(
+            repo_root,
+            ["validate-scheduler_non_blocking", "validate-all"],
+            "validate_repository_invariants",
+        )
+        stage_results.append(
+            emit_stage("validate_repository_invariants", "PASS", "invariants_valid", invariant_reasons)
+        )
+
+        stale_details = _check_stale_derived(repo_root, args.derived_policy)
+        stage_results.append(emit_stage("stale_artifact_check", "PASS", "stale_check_passed", stale_details))
+
+        stage_results.append(emit_stage("result", "PASS", "horoji_ci_check_passed", STAGE_ORDER))
+        sys.exit(0)
+
+    except StageFailure as exc:
+        stage_results.append(emit_stage(exc.stage, "FAIL", exc.reason, exc.details))
+        stage_results.append(emit_stage("result", "FAIL", "horoji_ci_check_failed", STAGE_ORDER))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

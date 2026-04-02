@@ -16,6 +16,7 @@ Exit codes:
 """
 
 import argparse
+import copy
 import datetime
 import fnmatch
 import json
@@ -40,6 +41,8 @@ OWNERSHIP_DIR = os.path.join(MEMORY_ROOT, "authoritative", "ownership")
 SCHEMA_FILE = os.path.join(MEMORY_ROOT, "schemas", "impact_set.schema.json")
 
 GENERATOR_NAME = "horoji-impact"
+GENERATED_AT_ENV = "HOROJI_GENERATED_AT"
+INPUT_COMMIT_ENV = "HOROJI_INPUT_COMMIT"
 
 # Canonical directory-to-subsystem mapping used to resolve files whose
 # ownership is not covered by an ownership artifact.
@@ -66,6 +69,9 @@ def fail(msg: str) -> None:
 # ---------------------------------------------------------------------------
 
 def get_input_commit() -> str:
+    override = os.environ.get(INPUT_COMMIT_ENV)
+    if override:
+        return override
     try:
         result = subprocess.run(
             ["git", "-C", REPO_ROOT, "rev-parse", "HEAD"],
@@ -210,6 +216,38 @@ def validate_output(artifact: dict, schema: dict) -> list[str]:
     ]
 
 
+def _logical_normalize(artifact: dict) -> dict:
+    normalized = copy.deepcopy(artifact)
+    provenance = normalized.get("provenance")
+    if isinstance(provenance, dict):
+        provenance.pop("input_commit", None)
+        provenance.pop("generated_at", None)
+    return normalized
+
+
+def _preserve_existing_provenance(output_file: str, artifact: dict) -> dict:
+    if not os.path.isfile(output_file):
+        return artifact
+    try:
+        with open(output_file, "r", encoding="utf-8") as fh:
+            existing = yaml.safe_load(fh)
+    except (OSError, yaml.YAMLError):
+        return artifact
+    if not isinstance(existing, dict):
+        return artifact
+    if _logical_normalize(existing) != _logical_normalize(artifact):
+        return artifact
+    existing_provenance = existing.get("provenance")
+    new_provenance = artifact.get("provenance")
+    if not isinstance(existing_provenance, dict) or not isinstance(new_provenance, dict):
+        return artifact
+    for field in ("input_commit", "generated_at"):
+        value = existing_provenance.get(field)
+        if isinstance(value, str) and value:
+            new_provenance[field] = value
+    return artifact
+
+
 # ---------------------------------------------------------------------------
 # Generation
 # ---------------------------------------------------------------------------
@@ -252,6 +290,7 @@ def generate_impact(
 
     safe_name = _safe_filename(file_path)
     output_file = os.path.join(DERIVED_IMPACT_SETS, f"{safe_name}.yaml")
+    artifact = _preserve_existing_provenance(output_file, artifact)
     with open(output_file, "w", encoding="utf-8") as fh:
         yaml.dump(
             artifact, fh, default_flow_style=False, sort_keys=True, allow_unicode=True
@@ -287,9 +326,11 @@ def main() -> None:
         fail(f"Output directory unavailable: {DERIVED_IMPACT_SETS}")
 
     input_commit = get_input_commit()
-    generated_at = datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
+    generated_at = os.environ.get(GENERATED_AT_ENV)
+    if not generated_at:
+        generated_at = datetime.datetime.now(datetime.timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
 
     for file_path in sorted(set(args.files)):
         generate_impact(
