@@ -7,8 +7,8 @@ impacted_subsystems:
 - horoji_validators
 provenance:
   artifact_type: impact_set
-  generated_at: '2026-04-02T01:31:35Z'
+  generated_at: '2026-04-02T01:37:20Z'
   generator: horoji-impact
-  input_commit: 1eaaf4c9c2040a7559c31dac40b014301e3cdc75
+  input_commit: 158bb628c76944d2334e7cf7d2bfb2ffd463d464
   schema_version: 1.0.0
   trust_level: derived
