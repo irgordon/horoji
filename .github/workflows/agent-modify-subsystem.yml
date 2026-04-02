@@ -1,0 +1,94 @@
+name: agent-modify-subsystem
+
+"on":
+  workflow_dispatch:
+    inputs:
+      subsystem:
+        description: "Target subsystem"
+        required: true
+        type: string
+      agent_name:
+        description: "Agent identifier"
+        required: true
+        type: string
+      agent_version:
+        description: "Agent version"
+        required: true
+        type: string
+
+jobs:
+  modify-subsystem:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install workflow dependencies
+        run: python -m pip install pyyaml pytest
+
+      - name: Retrieve Horoji context
+        run: |
+          set -euo pipefail
+          python tools/horoji/cli/horoji \
+            --repo-root "$GITHUB_WORKSPACE" \
+            get-context "${{ inputs.subsystem }}" > /tmp/horoji_context.yaml
+
+      - name: Invoke external agent (template)
+        run: |
+          set -euo pipefail
+          echo "Agent template execution; no repository mutation is performed directly."
+          printf "proposed_diff: []\n" > /tmp/agent_proposed_diff.yaml
+
+      - name: Emit structured agent execution log
+        run: |
+          set -euo pipefail
+          python tools/horoji/cli/horoji \
+            --repo-root "$GITHUB_WORKSPACE" \
+            log-agent-execution \
+            --agent-name "${{ inputs.agent_name }}" \
+            --agent-version "${{ inputs.agent_version }}" \
+            --timestamp "${{ github.event.head_commit.timestamp || github.run_id }}" \
+            --subsystem "${{ inputs.subsystem }}" \
+            --action "modify_subsystem" \
+            --status SUCCESS \
+            --detail "context_retrieved" \
+            --detail "diff_proposed" > /tmp/agent_execution_log.yaml
+
+      - name: Validate proposed change
+        run: |
+          set -euo pipefail
+          python tools/horoji/cli/horoji --repo-root "$GITHUB_WORKSPACE" validate
+
+      - name: Run standard Horoji CI checks
+        run: |
+          set -euo pipefail
+          python tools/horoji/cli/horoji-check \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --auto-diff \
+            --derived-policy committed
+
+      - name: Upload agent artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-modify-subsystem-logs
+          path: |
+            /tmp/horoji_context.yaml
+            /tmp/agent_proposed_diff.yaml
+            /tmp/agent_execution_log.yaml
+
+      - name: Handle failure
+        if: failure()
+        run: |
+          set -euo pipefail
+          echo "Agent modify-subsystem workflow failed validation or CI checks."
+          exit 1
