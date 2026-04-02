@@ -1,10 +1,24 @@
-edges: []
-nodes: []
+edges:
+- from: validate_against_schema
+  to: _is_type
+nodes:
+- _is_type
+- compute_repo_root
+- emit_yaml
+- is_valid_identifier
+- load_json
+- load_yaml
+- make_result
+- memory_root
+- normalize_path
+- validate_against_schema
+- yaml_files_in
+- yaml_files_recursive
 provenance:
   artifact_type: callgraph
-  generated_at: '2026-04-02T01:37:20Z'
+  generated_at: '2026-04-02T01:46:29Z'
   generator: horoji-callgraph
-  input_commit: 158bb628c76944d2334e7cf7d2bfb2ffd463d464
+  input_commit: 3f5e64685b045a54dcc31d00ca47e55d4d2ab4fa
   schema_version: 1.0.0
   trust_level: derived
 subsystem: horoji_validators

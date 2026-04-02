@@ -2,9 +2,9 @@ edges: []
 nodes: []
 provenance:
   artifact_type: callgraph
-  generated_at: '2026-04-02T01:37:20Z'
+  generated_at: '2026-04-02T01:46:29Z'
   generator: horoji-callgraph
-  input_commit: 158bb628c76944d2334e7cf7d2bfb2ffd463d464
+  input_commit: 3f5e64685b045a54dcc31d00ca47e55d4d2ab4fa
   schema_version: 1.0.0
   trust_level: derived
 subsystem: horoji_generators
