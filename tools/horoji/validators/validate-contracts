@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+"""Validate authoritative contracts."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+
+from _validator_common import (
+    compute_repo_root,
+    emit_yaml,
+    is_valid_identifier,
+    load_json,
+    load_yaml,
+    make_result,
+    memory_root,
+    normalize_path,
+    validate_against_schema,
+    yaml_files_in,
+)
+
+VALIDATOR = "validate-contracts"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Validate Horoji contracts")
+    parser.add_argument("--repo-root", help="Repository root override")
+    args = parser.parse_args()
+
+    repo_root = compute_repo_root(__file__, args.repo_root)
+    mem_root = memory_root(repo_root)
+    contracts_dir = os.path.join(mem_root, "authoritative", "contracts")
+    schema_file = os.path.join(mem_root, "schemas", "contract.schema.json")
+
+    try:
+        schema = load_json(schema_file)
+    except Exception as exc:
+        emit_yaml(
+            make_result(
+                VALIDATOR,
+                "ERROR",
+                normalize_path(schema_file, repo_root),
+                "configuration_error",
+                [str(exc)],
+            )
+        )
+        sys.exit(1)
+
+    contract_files = yaml_files_in(contracts_dir)
+    if not contract_files:
+        emit_yaml(
+            make_result(
+                VALIDATOR,
+                "FAIL",
+                normalize_path(contracts_dir, repo_root),
+                "no_contract_files",
+            )
+        )
+        sys.exit(1)
+
+    for path in contract_files:
+        target = normalize_path(path, repo_root)
+        try:
+            data = load_yaml(path)
+        except Exception as exc:
+            emit_yaml(
+                make_result(VALIDATOR, "ERROR", target, "parse_error", [str(exc)])
+            )
+            sys.exit(1)
+
+        if not isinstance(data, dict):
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "contract_not_mapping"))
+            sys.exit(1)
+
+        schema_errors = validate_against_schema(data, schema)
+        if schema_errors:
+            emit_yaml(
+                make_result(VALIDATOR, "FAIL", target, "schema_validation_failed", schema_errors)
+            )
+            sys.exit(1)
+
+        subsystem = data.get("subsystem", "")
+        if not isinstance(subsystem, str) or subsystem.strip() == "":
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "empty_subsystem_identifier"))
+            sys.exit(1)
+        if not is_valid_identifier(subsystem):
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "invalid_subsystem_identifier"))
+            sys.exit(1)
+
+        owner = data.get("owner", "")
+        if not isinstance(owner, str) or owner.strip() == "":
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "empty_owner"))
+            sys.exit(1)
+
+        exports = data.get("exports", [])
+        if len(exports) != len(set(exports)):
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "duplicate_exports"))
+            sys.exit(1)
+
+        allowed = data.get("allowed_dependencies", [])
+        forbidden = data.get("forbidden_dependencies", [])
+        if len(allowed) != len(set(allowed)):
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "duplicate_allowed_dependencies"))
+            sys.exit(1)
+        if len(forbidden) != len(set(forbidden)):
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "duplicate_forbidden_dependencies"))
+            sys.exit(1)
+
+        overlap = sorted(set(allowed).intersection(set(forbidden)))
+        if overlap:
+            emit_yaml(
+                make_result(
+                    VALIDATOR,
+                    "FAIL",
+                    target,
+                    "dependency_sets_not_disjoint",
+                    overlap,
+                )
+            )
+            sys.exit(1)
+
+        for dep in sorted(set(allowed + forbidden)):
+            if not isinstance(dep, str) or dep.strip() == "":
+                emit_yaml(make_result(VALIDATOR, "FAIL", target, "empty_dependency_name"))
+                sys.exit(1)
+            if not is_valid_identifier(dep):
+                emit_yaml(
+                    make_result(
+                        VALIDATOR,
+                        "FAIL",
+                        target,
+                        "invalid_dependency_identifier",
+                        [dep],
+                    )
+                )
+                sys.exit(1)
+
+    emit_yaml(
+        make_result(
+            VALIDATOR,
+            "PASS",
+            ".project_memory/authoritative/contracts",
+            "all_contracts_valid",
+            [f"count={len(contract_files)}"],
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()

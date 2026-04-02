@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""Repository-backed invariant validator for scheduler_non_blocking."""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import fnmatch
+import os
+import sys
+
+from _validator_common import (
+    compute_repo_root,
+    emit_yaml,
+    load_yaml,
+    make_result,
+    memory_root,
+    normalize_path,
+    yaml_files_in,
+)
+
+VALIDATOR = "validate-scheduler_non_blocking"
+INVARIANT_ID = "scheduler_non_blocking"
+
+
+def _extract_forbidden_calls(invariant_data: dict) -> list[str]:
+    enforcement = invariant_data.get("enforcement")
+    if not isinstance(enforcement, dict):
+        raise ValueError("invariant enforcement must be a mapping")
+    ast_query = enforcement.get("ast_query")
+    if not isinstance(ast_query, dict):
+        raise ValueError("invariant enforcement.ast_query must be a mapping")
+    forbidden = ast_query.get("forbidden_calls")
+    if not isinstance(forbidden, list) or not forbidden:
+        raise ValueError("invariant enforcement.ast_query.forbidden_calls must be a non-empty list")
+    normalized = sorted({str(item).strip() for item in forbidden if str(item).strip()})
+    if not normalized:
+        raise ValueError("invariant forbidden_calls resolved to an empty set")
+    return normalized
+
+
+def _extract_scope_patterns(invariant_data: dict) -> list[str]:
+    enforcement = invariant_data.get("enforcement", {})
+    ast_query = enforcement.get("ast_query", {}) if isinstance(enforcement, dict) else {}
+    scope = ast_query.get("scope", {}) if isinstance(ast_query, dict) else {}
+    if isinstance(scope, dict) and isinstance(scope.get("paths"), list):
+        values = [p for p in scope["paths"] if isinstance(p, str) and p.strip()]
+        if values:
+            return sorted(set(values))
+    return ["tools/horoji/**/*.py"]
+
+
+def _iter_python_files(repo_root: str, patterns: list[str]) -> list[str]:
+    results: set[str] = set()
+    for root, dirs, files in os.walk(repo_root):
+        dirs.sort()
+        for name in sorted(files):
+            if not name.endswith(".py"):
+                continue
+            full = os.path.join(root, name)
+            rel = os.path.relpath(full, repo_root).replace(os.sep, "/")
+            if any(fnmatch.fnmatch(rel, p) for p in patterns):
+                results.add(full)
+    return sorted(results)
+
+
+def _call_name(node: ast.Call) -> str | None:
+    if isinstance(node.func, ast.Name):
+        return node.func.id
+    if isinstance(node.func, ast.Attribute):
+        return node.func.attr
+    return None
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Validate scheduler_non_blocking invariant")
+    parser.add_argument("--repo-root", help="Repository root override")
+    parser.add_argument(
+        "--scope-pattern",
+        action="append",
+        dest="scope_patterns",
+        help="Override scope glob pattern (repeatable, repo-relative)",
+    )
+    args = parser.parse_args()
+
+    repo_root = compute_repo_root(__file__, args.repo_root)
+    mem_root = memory_root(repo_root)
+    invariants_dir = os.path.join(mem_root, "authoritative", "invariants")
+
+    invariant_file = None
+    invariant_data = None
+
+    for path in yaml_files_in(invariants_dir):
+        try:
+            data = load_yaml(path)
+        except Exception as exc:
+            emit_yaml(
+                make_result(
+                    VALIDATOR,
+                    "ERROR",
+                    normalize_path(path, repo_root),
+                    "parse_error",
+                    [str(exc)],
+                )
+            )
+            sys.exit(1)
+        if isinstance(data, dict) and data.get("id") == INVARIANT_ID:
+            invariant_file = path
+            invariant_data = data
+            break
+
+    if invariant_data is None or invariant_file is None:
+        emit_yaml(
+            make_result(
+                VALIDATOR,
+                "FAIL",
+                ".project_memory/authoritative/invariants",
+                "missing_scheduler_invariant",
+                [INVARIANT_ID],
+            )
+        )
+        sys.exit(1)
+
+    try:
+        forbidden_calls = _extract_forbidden_calls(invariant_data)
+    except Exception as exc:
+        emit_yaml(
+            make_result(
+                VALIDATOR,
+                "ERROR",
+                normalize_path(invariant_file, repo_root),
+                "invalid_invariant_structure",
+                [str(exc)],
+            )
+        )
+        sys.exit(1)
+
+    if args.scope_patterns:
+        scope_patterns = sorted(set(args.scope_patterns))
+    else:
+        scope_patterns = _extract_scope_patterns(invariant_data)
+
+    python_files = _iter_python_files(repo_root, scope_patterns)
+
+    hits: list[dict[str, str | int]] = []
+    forbidden_leaf = {symbol.split(".")[-1] for symbol in forbidden_calls}
+
+    for path in python_files:
+        rel = normalize_path(path, repo_root)
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                source = fh.read()
+            tree = ast.parse(source, filename=path)
+        except (OSError, SyntaxError) as exc:
+            emit_yaml(make_result(VALIDATOR, "ERROR", rel, "parse_error", [str(exc)]))
+            sys.exit(1)
+
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            symbol = _call_name(node)
+            if symbol is None:
+                continue
+            if symbol in forbidden_calls or symbol in forbidden_leaf:
+                hits.append({"file": rel, "line": int(node.lineno), "symbol": symbol})
+
+    if hits:
+        hits = sorted(hits, key=lambda item: (str(item["file"]), int(item["line"]), str(item["symbol"])))
+        first = hits[0]
+        emit_yaml(
+            make_result(
+                VALIDATOR,
+                "FAIL",
+                str(first["file"]),
+                "blocking_call_detected",
+                [
+                    f"line={first['line']}",
+                    f"symbol={first['symbol']}",
+                    f"forbidden_set={','.join(forbidden_calls)}",
+                ],
+            )
+        )
+        sys.exit(1)
+
+    emit_yaml(
+        make_result(
+            VALIDATOR,
+            "PASS",
+            ",".join(scope_patterns),
+            "no_forbidden_blocking_calls_detected",
+            [f"scanned_files={len(python_files)}", f"forbidden={','.join(forbidden_calls)}"],
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()

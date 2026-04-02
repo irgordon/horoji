@@ -1,0 +1,19 @@
+schema_version: "1.0.0"
+
+id: scheduler_non_blocking
+
+subsystem: horoji_validators
+
+description: >-
+  Scheduler-owned surfaces must not invoke explicitly forbidden blocking operations.
+  Enforcement is deterministic and repository-local.
+
+enforcement:
+  ast_query:
+    scope:
+      paths:
+        - "tools/horoji/**/*.py"
+    forbidden_calls:
+      - sleep
+      - read_blocking
+      - write_blocking

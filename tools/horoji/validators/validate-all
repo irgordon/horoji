@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Run all TASK_04 validators in deterministic order."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+import sys
+
+import yaml
+
+from _validator_common import compute_repo_root, emit_yaml, make_result, normalize_path
+
+VALIDATOR = "validate-all"
+ORDER = [
+    "validate-contracts",
+    "validate-invariants",
+    "validate-ownership",
+    "validate-provenance",
+    "validate-scheduler_non_blocking",
+]
+
+
+def _run_validator(repo_root: str, script_path: str) -> tuple[int, dict]:
+    result = subprocess.run(
+        [sys.executable, script_path, "--repo-root", repo_root],
+        capture_output=True,
+        text=True,
+    )
+
+    output_text = (result.stdout or "").strip()
+    if not output_text:
+        output_text = (result.stderr or "").strip()
+
+    try:
+        parsed = yaml.safe_load(output_text) if output_text else None
+    except yaml.YAMLError:
+        parsed = None
+
+    if not isinstance(parsed, dict):
+        parsed = make_result(
+            os.path.basename(script_path),
+            "ERROR",
+            normalize_path(script_path, repo_root),
+            "unstructured_validator_output",
+            [output_text[:300]],
+        )
+
+    return result.returncode, parsed
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run all Horoji validators")
+    parser.add_argument("--repo-root", help="Repository root override")
+    args = parser.parse_args()
+
+    repo_root = compute_repo_root(__file__, args.repo_root)
+    validators_dir = os.path.join(repo_root, "tools", "horoji", "validators")
+
+    results: list[dict] = []
+    has_failure = False
+
+    for name in ORDER:
+        script = os.path.join(validators_dir, name)
+        if not os.path.isfile(script):
+            results.append(
+                make_result(name, "ERROR", normalize_path(script, repo_root), "missing_validator_entrypoint")
+            )
+            has_failure = True
+            continue
+
+        return_code, parsed = _run_validator(repo_root, script)
+        results.append(parsed)
+
+        status = str(parsed.get("status", "ERROR"))
+        if return_code != 0 or status in {"FAIL", "ERROR"}:
+            has_failure = True
+
+    if has_failure:
+        emit_yaml(
+            {
+                "validator": VALIDATOR,
+                "status": "FAIL",
+                "target": "repository",
+                "reason": "one_or_more_validators_failed",
+                "details": [],
+                "results": results,
+            }
+        )
+        sys.exit(1)
+
+    emit_yaml(
+        {
+            "validator": VALIDATOR,
+            "status": "PASS",
+            "target": "repository",
+            "reason": "all_validators_passed",
+            "details": [],
+            "results": results,
+        }
+    )
+
+
+if __name__ == "__main__":
+    main()

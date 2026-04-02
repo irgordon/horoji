@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Validate derived artifact provenance and structure."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+
+from _validator_common import (
+    compute_repo_root,
+    emit_yaml,
+    load_json,
+    load_yaml,
+    make_result,
+    memory_root,
+    normalize_path,
+    validate_against_schema,
+    yaml_files_recursive,
+)
+
+VALIDATOR = "validate-provenance"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Validate Horoji derived provenance")
+    parser.add_argument("--repo-root", help="Repository root override")
+    args = parser.parse_args()
+
+    repo_root = compute_repo_root(__file__, args.repo_root)
+    mem_root = memory_root(repo_root)
+    derived_dir = os.path.join(mem_root, "derived")
+
+    provenance_schema_file = os.path.join(mem_root, "schemas", "provenance.schema.json")
+    callgraph_schema_file = os.path.join(mem_root, "schemas", "callgraph.schema.json")
+    dependency_schema_file = os.path.join(mem_root, "schemas", "dependency.schema.json")
+    impact_schema_file = os.path.join(mem_root, "schemas", "impact_set.schema.json")
+
+    try:
+        provenance_schema = load_json(provenance_schema_file)
+        callgraph_schema = load_json(callgraph_schema_file)
+        dependency_schema = load_json(dependency_schema_file)
+        impact_schema = load_json(impact_schema_file)
+    except Exception as exc:
+        emit_yaml(
+            make_result(
+                VALIDATOR,
+                "ERROR",
+                ".project_memory/schemas",
+                "configuration_error",
+                [str(exc)],
+            )
+        )
+        sys.exit(1)
+
+    schema_by_type = {
+        "callgraph": callgraph_schema,
+        "dependency": dependency_schema,
+        "impact_set": impact_schema,
+    }
+
+    artifact_files = yaml_files_recursive(derived_dir)
+    if not artifact_files:
+        emit_yaml(
+            make_result(
+                VALIDATOR,
+                "FAIL",
+                normalize_path(derived_dir, repo_root),
+                "no_derived_artifacts",
+            )
+        )
+        sys.exit(1)
+
+    for path in artifact_files:
+        target = normalize_path(path, repo_root)
+        try:
+            data = load_yaml(path)
+        except Exception as exc:
+            emit_yaml(make_result(VALIDATOR, "ERROR", target, "parse_error", [str(exc)]))
+            sys.exit(1)
+
+        if not isinstance(data, dict):
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "artifact_not_mapping"))
+            sys.exit(1)
+
+        provenance = data.get("provenance")
+        if not isinstance(provenance, dict):
+            emit_yaml(make_result(VALIDATOR, "FAIL", target, "missing_provenance"))
+            sys.exit(1)
+
+        provenance_errors = validate_against_schema(provenance, provenance_schema)
+        if provenance_errors:
+            emit_yaml(
+                make_result(
+                    VALIDATOR,
+                    "FAIL",
+                    target,
+                    "provenance_schema_validation_failed",
+                    provenance_errors,
+                )
+            )
+            sys.exit(1)
+
+        trust_level = provenance.get("trust_level")
+        if trust_level != "derived":
+            emit_yaml(
+                make_result(
+                    VALIDATOR,
+                    "FAIL",
+                    target,
+                    "invalid_trust_level",
+                    [str(trust_level)],
+                )
+            )
+            sys.exit(1)
+
+        artifact_type = provenance.get("artifact_type")
+        if artifact_type in schema_by_type:
+            full_schema_errors = validate_against_schema(data, schema_by_type[artifact_type])
+            if full_schema_errors:
+                emit_yaml(
+                    make_result(
+                        VALIDATOR,
+                        "FAIL",
+                        target,
+                        "artifact_structure_validation_failed",
+                        full_schema_errors,
+                    )
+                )
+                sys.exit(1)
+
+    emit_yaml(
+        make_result(
+            VALIDATOR,
+            "PASS",
+            ".project_memory/derived",
+            "all_derived_artifacts_have_valid_provenance",
+            [f"count={len(artifact_files)}"],
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()
