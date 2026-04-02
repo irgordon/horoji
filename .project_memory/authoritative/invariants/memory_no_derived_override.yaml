@@ -1,0 +1,18 @@
+schema_version: "1.0.0"
+
+id: memory_no_derived_override
+
+subsystem: horoji_memory
+
+description: >-
+  Derived artifacts must never override or redefine authoritative artifacts.
+  The memory subsystem must not allow any write operation on authoritative
+  paths that is sourced from a derived computation.
+
+enforcement:
+  ast_query:
+    forbidden_calls:
+      - write_authoritative_from_derived
+      - override_contract
+      - override_invariant
+      - override_ownership

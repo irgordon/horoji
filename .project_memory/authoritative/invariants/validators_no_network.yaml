@@ -1,0 +1,20 @@
+schema_version: "1.0.0"
+
+id: validators_no_network
+
+subsystem: horoji_validators
+
+description: >-
+  Validators must not perform network access. All validation must operate
+  exclusively on repository-local content and must not contact external
+  endpoints, services, or APIs.
+
+enforcement:
+  ast_query:
+    forbidden_calls:
+      - urllib.request.urlopen
+      - requests.get
+      - requests.post
+      - requests.put
+      - socket.connect
+      - http.client.HTTPConnection
