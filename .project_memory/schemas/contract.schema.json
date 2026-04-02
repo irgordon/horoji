@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "schema_version": "1.0.0",
+  "title": "Horoji Contract Schema",
+  "description": "Schema for authoritative subsystem contract artifacts",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "subsystem",
+    "exports",
+    "allowed_dependencies",
+    "forbidden_dependencies",
+    "owner"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Version of this schema"
+    },
+    "subsystem": {
+      "type": "string",
+      "description": "Unique identifier of the subsystem"
+    },
+    "exports": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Exported surfaces of this subsystem"
+    },
+    "allowed_dependencies": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Dependencies this subsystem is permitted to use"
+    },
+    "forbidden_dependencies": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Dependencies this subsystem must never use"
+    },
+    "owner": {
+      "type": "string",
+      "description": "Owning authority for this subsystem"
+    }
+  }
+}

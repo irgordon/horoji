@@ -1,0 +1,46 @@
+schema_version: "1.0.0"
+
+# Horoji configuration anchor
+# This file is the authoritative configuration surface for the Horoji subsystem.
+# All keys are explicit. Implicit defaults that change behavior are forbidden.
+
+horoji:
+  version: "1.0.0"
+
+  # Root of the Horoji memory tree, relative to the repository root
+  memory_root: ".project_memory"
+
+  # Subdirectory layout (must match canonical structure from ARCHITECTURE.md)
+  directories:
+    authoritative:
+      contracts: "authoritative/contracts"
+      invariants: "authoritative/invariants"
+      ownership: "authoritative/ownership"
+      architecture_manifest: "authoritative/architecture_manifest"
+    derived:
+      callgraphs: "derived/callgraphs"
+      dependencies: "derived/dependencies"
+      impact_sets: "derived/impact_sets"
+      summaries: "derived/summaries"
+      embeddings: "derived/embeddings"
+    history:
+      adr: "history/adr"
+      decisions: "history/decisions"
+    schemas: "schemas"
+    config: "config"
+
+  # Schema files (relative to memory_root/schemas/)
+  schemas:
+    contract: "contract.schema.json"
+    invariant: "invariant.schema.json"
+    ownership: "ownership.schema.json"
+    provenance: "provenance.schema.json"
+
+  # Trust level enforcement
+  trust:
+    authoritative_sources:
+      - "authoritative"
+    derived_sources:
+      - "derived"
+    # Derived artifacts must never override authoritative artifacts
+    derived_override_forbidden: true
