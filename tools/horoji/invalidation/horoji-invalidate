@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""horoji-invalidate — Deterministic invalidation engine for Horoji (TASK_03)."""
+
+import argparse
+import fnmatch
+import os
+import sys
+
+import yaml
+
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+MEMORY_ROOT = os.path.join(REPO_ROOT, ".project_memory")
+RULES_FILE = os.path.join(MEMORY_ROOT, "config", "invalidation_rules.yaml")
+
+ENGINE_NAME = "horoji-invalidate"
+ALL_DERIVED_ARTIFACT_CLASSES = ["callgraphs", "dependencies", "impact_sets"]
+
+
+def emit_error(error_type: str, message: str) -> None:
+    payload = {"error": {"type": error_type, "message": message}}
+    yaml.safe_dump(payload, sys.stderr, sort_keys=True)
+    sys.exit(1)
+
+
+def normalize_changed_files(paths: list[str]) -> list[str]:
+    normalized = []
+    for path in paths:
+        cleaned = path.strip()
+        if not cleaned:
+            continue
+        normalized.append(cleaned.replace("\\", "/"))
+    return sorted(set(normalized))
+
+
+def load_rules() -> list[dict]:
+    if not os.path.isfile(RULES_FILE):
+        emit_error("configuration_error", "invalidation rules file missing")
+    try:
+        with open(RULES_FILE, "r", encoding="utf-8") as fh:
+            data = yaml.safe_load(fh)
+    except yaml.YAMLError as exc:
+        emit_error("configuration_error", f"invalidation rules malformed: {exc}")
+    if not isinstance(data, dict):
+        emit_error("configuration_error", "invalidation rules root must be a mapping")
+    rules = data.get("rules")
+    if not isinstance(rules, list):
+        emit_error("configuration_error", "invalidation rules 'rules' must be a list")
+    for index, rule in enumerate(rules):
+        if not isinstance(rule, dict):
+            emit_error("configuration_error", f"rule[{index}] must be a mapping")
+        trigger = rule.get("trigger")
+        invalidate = rule.get("invalidate")
+        if not isinstance(trigger, list) or not trigger or not all(
+            isinstance(item, str) and item for item in trigger
+        ):
+            emit_error(
+                "configuration_error",
+                f"rule[{index}] has invalid 'trigger' list",
+            )
+        if not isinstance(invalidate, list) or not invalidate or not all(
+            isinstance(item, str) and item for item in invalidate
+        ):
+            emit_error(
+                "configuration_error",
+                f"rule[{index}] has invalid 'invalidate' list",
+            )
+        reasons = rule.get("reason", [])
+        if reasons and (
+            not isinstance(reasons, list)
+            or not all(isinstance(item, str) and item for item in reasons)
+        ):
+            emit_error("configuration_error", f"rule[{index}] has invalid 'reason' list")
+    return rules
+
+
+def resolve_reasons(rule: dict) -> list[str]:
+    reasons = rule.get("reason")
+    if isinstance(reasons, list) and reasons:
+        return reasons
+    return ["rule_triggered"]
+
+
+def compute_invalidation_result(changed_files: list[str], rules: list[dict]) -> dict:
+    matched_artifacts: set[str] = set()
+    matched_reasons: set[str] = set()
+    unmatched_files = []
+
+    for path in changed_files:
+        matched_this_file = False
+        for rule in rules:
+            triggers = rule["trigger"]
+            if any(fnmatch.fnmatch(path, pattern) for pattern in triggers):
+                matched_this_file = True
+                matched_artifacts.update(rule["invalidate"])
+                matched_reasons.update(resolve_reasons(rule))
+        if not matched_this_file:
+            unmatched_files.append(path)
+
+    if unmatched_files:
+        return {
+            "invalidation_result": {
+                "affected_artifacts": ALL_DERIVED_ARTIFACT_CLASSES,
+                "reason": ["unknown_change_pattern_detected"],
+                "scope": "full_regeneration",
+                "unmatched_files": sorted(unmatched_files),
+            }
+        }
+
+    if not matched_artifacts:
+        return {
+            "invalidation_result": {
+                "affected_artifacts": ALL_DERIVED_ARTIFACT_CLASSES,
+                "reason": ["uncertain_scope_detected"],
+                "scope": "full_regeneration",
+            }
+        }
+
+    return {
+        "invalidation_result": {
+            "affected_artifacts": sorted(matched_artifacts),
+            "reason": sorted(matched_reasons),
+            "scope": "conservative",
+        }
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Compute deterministic derived artifact invalidation from changed files."
+    )
+    parser.add_argument(
+        "--changed-file",
+        action="append",
+        dest="changed_files",
+        default=[],
+        help="Repository-relative changed file path (may be repeated).",
+    )
+    parser.add_argument(
+        "--changed-files-file",
+        dest="changed_files_file",
+        help="Path to a file containing changed paths, one per line.",
+    )
+    args = parser.parse_args()
+
+    changed_files = list(args.changed_files)
+    if args.changed_files_file:
+        if not os.path.isfile(args.changed_files_file):
+            emit_error("input_error", "changed files list file missing")
+        try:
+            with open(args.changed_files_file, "r", encoding="utf-8") as fh:
+                changed_files.extend(line.rstrip("\n") for line in fh)
+        except OSError as exc:
+            emit_error("input_error", f"failed to read changed files list: {exc}")
+
+    normalized = normalize_changed_files(changed_files)
+    if not normalized:
+        emit_error("input_error", "changed files input missing")
+
+    rules = load_rules()
+    result = compute_invalidation_result(normalized, rules)
+    yaml.safe_dump(result, sys.stdout, sort_keys=True)
+
+
+if __name__ == "__main__":
+    main()

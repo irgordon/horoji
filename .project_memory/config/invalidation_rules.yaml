@@ -8,4 +8,21 @@ schema_version: "1.0.0"
 # Under-invalidation is forbidden: uncertain scope must widen to full regeneration.
 # This file is minimal in Phase 0. Rules will be populated in TASK_03.
 
-rules: []
+rules:
+  - trigger:
+      - "core/scheduler/*.c"
+      - "core/scheduler/**/*.c"
+    invalidate:
+      - impact_sets
+    reason:
+      - scheduler_source_change_detected
+
+  - trigger:
+      - "include/*.h"
+      - "include/**/*.h"
+    invalidate:
+      - callgraphs
+      - dependencies
+      - impact_sets
+    reason:
+      - header_change_detected
