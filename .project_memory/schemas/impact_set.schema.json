@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "schema_version": "1.0.0",
+  "title": "Horoji Impact Set Schema",
+  "description": "Schema for derived impact set artifacts produced by horoji-impact",
+  "type": "object",
+  "required": [
+    "provenance",
+    "file",
+    "impacted_subsystems"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "provenance": {
+      "type": "object",
+      "description": "Provenance metadata block conforming to provenance.schema.json",
+      "required": [
+        "artifact_type",
+        "trust_level",
+        "generator",
+        "schema_version",
+        "input_commit",
+        "generated_at"
+      ],
+      "properties": {
+        "artifact_type": { "type": "string" },
+        "trust_level": { "type": "string", "enum": ["derived"] },
+        "generator": { "type": "string" },
+        "schema_version": { "type": "string" },
+        "input_commit": { "type": "string" },
+        "generated_at": { "type": "string" }
+      }
+    },
+    "file": {
+      "type": "string",
+      "description": "Repository-relative path of the file whose impact is computed"
+    },
+    "impacted_subsystems": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Sorted list of subsystems impacted by changes to the given file"
+    }
+  }
+}

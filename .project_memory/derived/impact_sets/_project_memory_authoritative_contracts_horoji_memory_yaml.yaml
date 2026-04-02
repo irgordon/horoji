@@ -1,0 +1,14 @@
+file: .project_memory/authoritative/contracts/horoji_memory.yaml
+impacted_subsystems:
+- horoji_cli
+- horoji_generators
+- horoji_invalidation
+- horoji_memory
+- horoji_validators
+provenance:
+  artifact_type: impact_set
+  generated_at: '2026-04-02T01:24:01Z'
+  generator: horoji-impact
+  input_commit: f92735f821547c3291f243441afd0a8a9f046935
+  schema_version: 1.0.0
+  trust_level: derived

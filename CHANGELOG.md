@@ -8,6 +8,47 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — TASK_02: Deterministic Derived Artifact Generators (Phase 2)
+
+- Created three deterministic generator entrypoints under `tools/horoji/generators/`:
+  - `horoji-callgraph` — computes function-level call relationships from Python source
+    files for each subsystem declared in the architecture manifest; writes YAML artifacts
+    to `.project_memory/derived/callgraphs/`
+  - `horoji-deps` — extracts import-level dependency relationships from Python source
+    files per subsystem; writes YAML artifacts to `.project_memory/derived/dependencies/`
+  - `horoji-impact` — maps a repository file to its owning subsystem via ownership rules
+    and computes the minimal affected subsystem set from the architecture manifest; writes
+    YAML artifacts to `.project_memory/derived/impact_sets/`
+- All three generators:
+  - attach mandatory provenance metadata (`artifact_type`, `trust_level`, `generator`,
+    `schema_version`, `input_commit`, `generated_at`) to every output artifact
+  - produce deterministic, sort-stable output (sorted keys, sorted collections)
+  - validate outputs against their respective schemas before writing
+  - fail explicitly with a non-zero exit code and structured stderr on malformed inputs,
+    missing config, missing manifest, or unavailable output directories
+  - operate strictly within the repository (no network, no external filesystem access)
+  - write derived artifacts only to the `.project_memory/derived/` subtree
+- Created three derived artifact schemas under `.project_memory/schemas/`:
+  - `callgraph.schema.json` — schema for callgraph artifacts
+  - `dependency.schema.json` — schema for dependency artifacts
+  - `impact_set.schema.json` — schema for impact set artifacts
+- Created `tests/horoji/test_generators.py` with:
+  - Generator entrypoint existence tests
+  - Derived schema existence and parseability tests
+  - Execution success tests on valid repository state
+  - Output location tests (derived subtree only)
+  - Provenance presence and correctness tests for all artifact classes
+  - Schema validation tests for all generated artifacts
+  - Determinism tests (repeated execution produces logically identical outputs)
+  - Explicit failure tests (unknown subsystem, missing config, malformed manifest,
+    missing required arguments)
+  - Authoritative boundary tests (derived artifacts do not overwrite authoritative data)
+  - Impact correctness tests (ownership resolution and transitive dependency propagation)
+  - Negative schema validation tests
+
+Invalidation logic, enforcement validators, CI gating, and agent integration remain
+deferred to later tasks (TASK_03 through TASK_06).
+
 ### Added — TASK_01: Authoritative Metadata Layer (Phase 1)
 
 - Created subsystem contract files under `.project_memory/authoritative/contracts/`:

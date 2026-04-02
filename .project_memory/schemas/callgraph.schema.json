@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "schema_version": "1.0.0",
+  "title": "Horoji Callgraph Schema",
+  "description": "Schema for derived callgraph artifacts produced by horoji-callgraph",
+  "type": "object",
+  "required": [
+    "provenance",
+    "subsystem",
+    "nodes",
+    "edges"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "provenance": {
+      "type": "object",
+      "description": "Provenance metadata block conforming to provenance.schema.json",
+      "required": [
+        "artifact_type",
+        "trust_level",
+        "generator",
+        "schema_version",
+        "input_commit",
+        "generated_at"
+      ],
+      "properties": {
+        "artifact_type": { "type": "string" },
+        "trust_level": { "type": "string", "enum": ["derived"] },
+        "generator": { "type": "string" },
+        "schema_version": { "type": "string" },
+        "input_commit": { "type": "string" },
+        "generated_at": { "type": "string" }
+      }
+    },
+    "subsystem": {
+      "type": "string",
+      "description": "Subsystem identifier"
+    },
+    "nodes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Sorted list of callable identifiers defined in this subsystem"
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "from": { "type": "string" },
+          "to": { "type": "string" }
+        }
+      },
+      "description": "Sorted list of call edges between nodes"
+    }
+  }
+}

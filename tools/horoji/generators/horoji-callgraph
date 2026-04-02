@@ -1,0 +1,288 @@
+#!/usr/bin/env python3
+"""horoji-callgraph — Callgraph generator for Horoji (TASK_02).
+
+Computes function-level call relationships within each Horoji subsystem
+from Python source files and writes deterministic YAML artifacts to
+.project_memory/derived/callgraphs/.
+
+Usage:
+    horoji-callgraph [--subsystem SUBSYSTEM]
+
+If --subsystem is omitted, all subsystems declared in the architecture
+manifest are processed.
+
+Exit codes:
+    0  Success
+    1  Failure (structured error written to stderr)
+"""
+
+import argparse
+import ast
+import datetime
+import json
+import os
+import subprocess
+import sys
+
+import yaml
+
+# ---------------------------------------------------------------------------
+# Path constants
+# ---------------------------------------------------------------------------
+
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+MEMORY_ROOT = os.path.join(REPO_ROOT, ".project_memory")
+DERIVED_CALLGRAPHS = os.path.join(MEMORY_ROOT, "derived", "callgraphs")
+CONFIG_FILE = os.path.join(MEMORY_ROOT, "config", "horoji.config.yaml")
+MANIFEST_FILE = os.path.join(
+    MEMORY_ROOT, "authoritative", "architecture_manifest", "manifest.yaml"
+)
+SCHEMA_FILE = os.path.join(MEMORY_ROOT, "schemas", "callgraph.schema.json")
+
+GENERATOR_NAME = "horoji-callgraph"
+
+# Canonical directory-to-subsystem mapping (derived from architecture manifest
+# and ownership rules; kept explicit for determinism).
+SUBSYSTEM_DIRS = {
+    "horoji_cli": os.path.join(REPO_ROOT, "tools", "horoji", "cli"),
+    "horoji_generators": os.path.join(REPO_ROOT, "tools", "horoji", "generators"),
+    "horoji_validators": os.path.join(REPO_ROOT, "tools", "horoji", "validators"),
+    "horoji_invalidation": os.path.join(REPO_ROOT, "tools", "horoji", "invalidation"),
+    "horoji_memory": os.path.join(REPO_ROOT, ".project_memory"),
+}
+
+
+# ---------------------------------------------------------------------------
+# Failure helper
+# ---------------------------------------------------------------------------
+
+def fail(msg: str) -> None:
+    print(f"ERROR [{GENERATOR_NAME}]: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# Input loading
+# ---------------------------------------------------------------------------
+
+def get_input_commit() -> str:
+    try:
+        result = subprocess.run(
+            ["git", "-C", REPO_ROOT, "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as exc:
+        fail(f"Failed to determine repository revision: {exc}")
+
+
+def load_config() -> dict:
+    if not os.path.isfile(CONFIG_FILE):
+        fail(f"Required config file missing: {CONFIG_FILE}")
+    with open(CONFIG_FILE, "r", encoding="utf-8") as fh:
+        try:
+            data = yaml.safe_load(fh)
+        except yaml.YAMLError as exc:
+            fail(f"Config file parse error: {exc}")
+    if not isinstance(data, dict):
+        fail(f"Config file must parse to a mapping: {CONFIG_FILE}")
+    return data
+
+
+def load_manifest() -> dict:
+    if not os.path.isfile(MANIFEST_FILE):
+        fail(f"Required architecture manifest missing: {MANIFEST_FILE}")
+    with open(MANIFEST_FILE, "r", encoding="utf-8") as fh:
+        try:
+            data = yaml.safe_load(fh)
+        except yaml.YAMLError as exc:
+            fail(f"Manifest parse error: {exc}")
+    if not isinstance(data, dict) or "subsystems" not in data:
+        fail(f"Architecture manifest malformed — missing 'subsystems' key: {MANIFEST_FILE}")
+    return data
+
+
+def load_schema() -> dict:
+    if not os.path.isfile(SCHEMA_FILE):
+        fail(f"Required schema file missing: {SCHEMA_FILE}")
+    with open(SCHEMA_FILE, "r", encoding="utf-8") as fh:
+        try:
+            return json.load(fh)
+        except json.JSONDecodeError as exc:
+            fail(f"Schema file parse error: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Source analysis
+# ---------------------------------------------------------------------------
+
+def collect_python_files(directory: str) -> list[str]:
+    """Return a sorted list of .py file paths under *directory* (recursive)."""
+    result = []
+    if not os.path.isdir(directory):
+        return result
+    for root, dirs, files in os.walk(directory):
+        dirs.sort()
+        for fname in sorted(files):
+            if fname.endswith(".py"):
+                result.append(os.path.join(root, fname))
+    return result
+
+
+def analyze_callgraph(python_files: list[str]) -> tuple[list[str], list[dict]]:
+    """
+    Parse *python_files* with ast and extract function-level call relationships.
+
+    Returns:
+        nodes: sorted list of function/method names defined in the files
+        edges: sorted list of {"from": caller, "to": callee} dicts where both
+               caller and callee are defined within the same file set
+    """
+    defined_functions: set[str] = set()
+    call_map: dict[str, set[str]] = {}
+
+    for fpath in python_files:
+        try:
+            with open(fpath, "r", encoding="utf-8") as fh:
+                source = fh.read()
+            tree = ast.parse(source, filename=fpath)
+        except OSError as exc:
+            fail(f"Failed to read source file {fpath}: {exc}")
+        except SyntaxError as exc:
+            fail(f"Syntax error in source file {fpath}: {exc}")
+
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                defined_functions.add(node.name)
+                calls: set[str] = set()
+                for child in ast.walk(node):
+                    if isinstance(child, ast.Call):
+                        if isinstance(child.func, ast.Name):
+                            calls.add(child.func.id)
+                        elif isinstance(child.func, ast.Attribute):
+                            calls.add(child.func.attr)
+                call_map.setdefault(node.name, set()).update(calls)
+
+    edges: list[dict] = []
+    for caller in sorted(call_map):
+        for callee in sorted(call_map[caller]):
+            if callee in defined_functions and callee != caller:
+                edges.append({"from": caller, "to": callee})
+
+    return sorted(defined_functions), edges
+
+
+# ---------------------------------------------------------------------------
+# Output validation
+# ---------------------------------------------------------------------------
+
+def validate_output(artifact: dict, schema: dict) -> list[str]:
+    """Minimal validation: check all required top-level fields are present."""
+    required = schema.get("required", [])
+    return [
+        f"Missing required field: '{field}'"
+        for field in required
+        if field not in artifact
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Generation
+# ---------------------------------------------------------------------------
+
+def generate_subsystem(
+    subsystem: str,
+    input_commit: str,
+    generated_at: str,
+    schema: dict,
+) -> None:
+    subsystem_dir = SUBSYSTEM_DIRS.get(subsystem)
+    if subsystem_dir is None:
+        print(
+            f"  [{GENERATOR_NAME}] skipping {subsystem}: no source directory mapping",
+            file=sys.stderr,
+        )
+        return
+
+    python_files = collect_python_files(subsystem_dir)
+    nodes, edges = analyze_callgraph(python_files)
+
+    artifact = {
+        "provenance": {
+            "artifact_type": "callgraph",
+            "trust_level": "derived",
+            "generator": GENERATOR_NAME,
+            "schema_version": "1.0.0",
+            "input_commit": input_commit,
+            "generated_at": generated_at,
+        },
+        "subsystem": subsystem,
+        "nodes": nodes,
+        "edges": edges,
+    }
+
+    errors = validate_output(artifact, schema)
+    if errors:
+        fail(f"Output validation failed for subsystem '{subsystem}': {errors}")
+
+    if not os.path.isdir(DERIVED_CALLGRAPHS):
+        fail(f"Output directory unavailable: {DERIVED_CALLGRAPHS}")
+
+    output_file = os.path.join(DERIVED_CALLGRAPHS, f"{subsystem}.yaml")
+    with open(output_file, "w", encoding="utf-8") as fh:
+        yaml.dump(artifact, fh, default_flow_style=False, sort_keys=True, allow_unicode=True)
+
+    print(f"  [{GENERATOR_NAME}] generated: {output_file}")
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Generate callgraph derived artifacts for Horoji subsystems."
+    )
+    parser.add_argument(
+        "--subsystem",
+        metavar="SUBSYSTEM",
+        help="Subsystem to process (default: all subsystems in manifest)",
+    )
+    args = parser.parse_args()
+
+    load_config()
+    manifest = load_manifest()
+    schema = load_schema()
+
+    if not os.path.isdir(DERIVED_CALLGRAPHS):
+        fail(f"Output directory unavailable: {DERIVED_CALLGRAPHS}")
+
+    input_commit = get_input_commit()
+    generated_at = datetime.datetime.now(datetime.timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+
+    subsystems = manifest.get("subsystems", {})
+    if not isinstance(subsystems, dict) or not subsystems:
+        fail("Architecture manifest declares no subsystems")
+
+    if args.subsystem is not None:
+        if args.subsystem not in subsystems:
+            fail(
+                f"Unknown subsystem '{args.subsystem}'; "
+                f"declared subsystems: {sorted(subsystems)}"
+            )
+        targets = [args.subsystem]
+    else:
+        targets = sorted(subsystems)
+
+    for subsystem in targets:
+        generate_subsystem(subsystem, input_commit, generated_at, schema)
+
+    print(f"[{GENERATOR_NAME}] generation complete")
+
+
+if __name__ == "__main__":
+    main()
