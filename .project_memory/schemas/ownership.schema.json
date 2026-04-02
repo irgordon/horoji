@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "schema_version": "1.0.0",
+  "title": "Horoji Ownership Schema",
+  "description": "Schema for authoritative ownership mapping artifacts",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "pattern",
+    "owner"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Version of this schema"
+    },
+    "pattern": {
+      "type": "string",
+      "description": "Repository glob pattern this ownership record applies to"
+    },
+    "owner": {
+      "type": "string",
+      "description": "Owning authority for the matched paths"
+    },
+    "review_required": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Identities required to review changes to matched paths"
+    }
+  }
+}

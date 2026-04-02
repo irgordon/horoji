@@ -1,0 +1,11 @@
+schema_version: "1.0.0"
+
+# Horoji invalidation rules anchor
+# This file defines which derived artifact classes must be regenerated
+# when specific repository paths change.
+#
+# Rules are evaluated deterministically in order.
+# Under-invalidation is forbidden: uncertain scope must widen to full regeneration.
+# This file is minimal in Phase 0. Rules will be populated in TASK_03.
+
+rules: []

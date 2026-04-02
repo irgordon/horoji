@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "schema_version": "1.0.0",
+  "title": "Horoji Invariant Schema",
+  "description": "Schema for authoritative invariant artifacts",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "subsystem",
+    "description",
+    "enforcement"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Version of this schema"
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique invariant identifier"
+    },
+    "subsystem": {
+      "type": "string",
+      "description": "Subsystem this invariant applies to"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the invariant"
+    },
+    "enforcement": {
+      "type": "object",
+      "description": "Machine-verifiable enforcement definition"
+    }
+  }
+}

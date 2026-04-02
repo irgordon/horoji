@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "horoji"
+version = "0.1.0"
+description = "Horoji — deterministic repository-local project memory subsystem"
+requires-python = ">=3.12"
+
+[project.optional-dependencies]
+test = [
+    "pytest>=9.0",
+    "pyyaml>=6.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
