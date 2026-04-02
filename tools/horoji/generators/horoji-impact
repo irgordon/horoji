@@ -1,0 +1,303 @@
+#!/usr/bin/env python3
+"""horoji-impact — Impact set generator for Horoji (TASK_02).
+
+Computes the minimal set of subsystems affected by changes to a given
+repository file and writes a deterministic YAML artifact to
+.project_memory/derived/impact_sets/.
+
+Usage:
+    horoji-impact --file FILE [--file FILE ...]
+
+FILE must be a path relative to the repository root.
+
+Exit codes:
+    0  Success
+    1  Failure (structured error written to stderr)
+"""
+
+import argparse
+import datetime
+import fnmatch
+import json
+import os
+import subprocess
+import sys
+
+import yaml
+
+# ---------------------------------------------------------------------------
+# Path constants
+# ---------------------------------------------------------------------------
+
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+MEMORY_ROOT = os.path.join(REPO_ROOT, ".project_memory")
+DERIVED_IMPACT_SETS = os.path.join(MEMORY_ROOT, "derived", "impact_sets")
+CONFIG_FILE = os.path.join(MEMORY_ROOT, "config", "horoji.config.yaml")
+MANIFEST_FILE = os.path.join(
+    MEMORY_ROOT, "authoritative", "architecture_manifest", "manifest.yaml"
+)
+OWNERSHIP_DIR = os.path.join(MEMORY_ROOT, "authoritative", "ownership")
+SCHEMA_FILE = os.path.join(MEMORY_ROOT, "schemas", "impact_set.schema.json")
+
+GENERATOR_NAME = "horoji-impact"
+
+# Canonical directory-to-subsystem mapping used to resolve files whose
+# ownership is not covered by an ownership artifact.
+PATH_PREFIX_TO_SUBSYSTEM: list[tuple[str, str]] = [
+    ("tools/horoji/cli/", "horoji_cli"),
+    ("tools/horoji/generators/", "horoji_generators"),
+    ("tools/horoji/validators/", "horoji_validators"),
+    ("tools/horoji/invalidation/", "horoji_invalidation"),
+    (".project_memory/", "horoji_memory"),
+]
+
+
+# ---------------------------------------------------------------------------
+# Failure helper
+# ---------------------------------------------------------------------------
+
+def fail(msg: str) -> None:
+    print(f"ERROR [{GENERATOR_NAME}]: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# Input loading
+# ---------------------------------------------------------------------------
+
+def get_input_commit() -> str:
+    try:
+        result = subprocess.run(
+            ["git", "-C", REPO_ROOT, "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as exc:
+        fail(f"Failed to determine repository revision: {exc}")
+
+
+def load_config() -> dict:
+    if not os.path.isfile(CONFIG_FILE):
+        fail(f"Required config file missing: {CONFIG_FILE}")
+    with open(CONFIG_FILE, "r", encoding="utf-8") as fh:
+        try:
+            data = yaml.safe_load(fh)
+        except yaml.YAMLError as exc:
+            fail(f"Config file parse error: {exc}")
+    if not isinstance(data, dict):
+        fail(f"Config file must parse to a mapping: {CONFIG_FILE}")
+    return data
+
+
+def load_manifest() -> dict:
+    if not os.path.isfile(MANIFEST_FILE):
+        fail(f"Required architecture manifest missing: {MANIFEST_FILE}")
+    with open(MANIFEST_FILE, "r", encoding="utf-8") as fh:
+        try:
+            data = yaml.safe_load(fh)
+        except yaml.YAMLError as exc:
+            fail(f"Manifest parse error: {exc}")
+    if not isinstance(data, dict) or "subsystems" not in data:
+        fail(f"Architecture manifest malformed — missing 'subsystems' key: {MANIFEST_FILE}")
+    return data
+
+
+def load_ownership_rules() -> list[dict]:
+    """
+    Load all ownership YAML files from the ownership directory.
+    Returns a sorted list of dicts, each with at least 'pattern' and 'owner'.
+    """
+    if not os.path.isdir(OWNERSHIP_DIR):
+        fail(f"Ownership directory missing: {OWNERSHIP_DIR}")
+
+    rules = []
+    for fname in sorted(os.listdir(OWNERSHIP_DIR)):
+        if not fname.endswith(".yaml"):
+            continue
+        fpath = os.path.join(OWNERSHIP_DIR, fname)
+        with open(fpath, "r", encoding="utf-8") as fh:
+            try:
+                data = yaml.safe_load(fh)
+            except yaml.YAMLError as exc:
+                fail(f"Ownership file parse error {fpath}: {exc}")
+        if not isinstance(data, dict):
+            fail(f"Ownership file must parse to a mapping: {fpath}")
+        if "pattern" not in data or "owner" not in data:
+            fail(
+                f"Ownership file missing required fields ('pattern', 'owner'): {fpath}"
+            )
+        rules.append(data)
+    return rules
+
+
+def load_schema() -> dict:
+    if not os.path.isfile(SCHEMA_FILE):
+        fail(f"Required schema file missing: {SCHEMA_FILE}")
+    with open(SCHEMA_FILE, "r", encoding="utf-8") as fh:
+        try:
+            return json.load(fh)
+        except json.JSONDecodeError as exc:
+            fail(f"Schema file parse error: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Subsystem resolution
+# ---------------------------------------------------------------------------
+
+def resolve_owning_subsystem(
+    file_path: str, ownership_rules: list[dict]
+) -> str | None:
+    """
+    Determine which subsystem owns *file_path* (repo-relative).
+
+    Ownership rules are matched with fnmatch.  The first matching rule wins
+    (rules are sorted by filename for determinism).  Falls back to
+    PATH_PREFIX_TO_SUBSYSTEM if no rule matches.
+    """
+    for rule in ownership_rules:
+        pattern = rule["pattern"]
+        if fnmatch.fnmatch(file_path, pattern):
+            return rule["owner"]
+
+    for prefix, subsystem in PATH_PREFIX_TO_SUBSYSTEM:
+        if file_path.startswith(prefix):
+            return subsystem
+
+    return None
+
+
+def compute_impacted_subsystems(
+    owning_subsystem: str | None, manifest: dict
+) -> list[str]:
+    """
+    Return the sorted list of subsystems impacted by a change to
+    *owning_subsystem*.
+
+    A subsystem is impacted if:
+      - it IS the owning subsystem, OR
+      - it lists the owning subsystem in its depends_on list.
+
+    Returns an empty list if *owning_subsystem* is None.
+    """
+    if owning_subsystem is None:
+        return []
+
+    subsystems: dict = manifest.get("subsystems", {})
+    impacted: set[str] = {owning_subsystem}
+
+    for name, entry in subsystems.items():
+        if not isinstance(entry, dict):
+            continue
+        deps = entry.get("depends_on", [])
+        if isinstance(deps, list) and owning_subsystem in deps:
+            impacted.add(name)
+
+    return sorted(impacted)
+
+
+# ---------------------------------------------------------------------------
+# Output validation
+# ---------------------------------------------------------------------------
+
+def validate_output(artifact: dict, schema: dict) -> list[str]:
+    required = schema.get("required", [])
+    return [
+        f"Missing required field: '{field}'"
+        for field in required
+        if field not in artifact
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Generation
+# ---------------------------------------------------------------------------
+
+def _safe_filename(file_path: str) -> str:
+    """Convert a repo-relative path to a safe filename by replacing / and . ."""
+    return file_path.replace("/", "_").replace(".", "_")
+
+
+def generate_impact(
+    file_path: str,
+    ownership_rules: list[dict],
+    manifest: dict,
+    input_commit: str,
+    generated_at: str,
+    schema: dict,
+) -> None:
+    owning_subsystem = resolve_owning_subsystem(file_path, ownership_rules)
+    impacted_subsystems = compute_impacted_subsystems(owning_subsystem, manifest)
+
+    artifact = {
+        "provenance": {
+            "artifact_type": "impact_set",
+            "trust_level": "derived",
+            "generator": GENERATOR_NAME,
+            "schema_version": "1.0.0",
+            "input_commit": input_commit,
+            "generated_at": generated_at,
+        },
+        "file": file_path,
+        "impacted_subsystems": impacted_subsystems,
+    }
+
+    errors = validate_output(artifact, schema)
+    if errors:
+        fail(f"Output validation failed for file '{file_path}': {errors}")
+
+    if not os.path.isdir(DERIVED_IMPACT_SETS):
+        fail(f"Output directory unavailable: {DERIVED_IMPACT_SETS}")
+
+    safe_name = _safe_filename(file_path)
+    output_file = os.path.join(DERIVED_IMPACT_SETS, f"{safe_name}.yaml")
+    with open(output_file, "w", encoding="utf-8") as fh:
+        yaml.dump(
+            artifact, fh, default_flow_style=False, sort_keys=True, allow_unicode=True
+        )
+
+    print(f"  [{GENERATOR_NAME}] generated: {output_file}")
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Generate impact set derived artifacts for repository files."
+    )
+    parser.add_argument(
+        "--file",
+        metavar="FILE",
+        action="append",
+        dest="files",
+        required=True,
+        help="Repository-relative file path (may be repeated)",
+    )
+    args = parser.parse_args()
+
+    load_config()
+    manifest = load_manifest()
+    ownership_rules = load_ownership_rules()
+    schema = load_schema()
+
+    if not os.path.isdir(DERIVED_IMPACT_SETS):
+        fail(f"Output directory unavailable: {DERIVED_IMPACT_SETS}")
+
+    input_commit = get_input_commit()
+    generated_at = datetime.datetime.now(datetime.timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+
+    for file_path in sorted(set(args.files)):
+        generate_impact(
+            file_path, ownership_rules, manifest, input_commit, generated_at, schema
+        )
+
+    print(f"[{GENERATOR_NAME}] generation complete")
+
+
+if __name__ == "__main__":
+    main()

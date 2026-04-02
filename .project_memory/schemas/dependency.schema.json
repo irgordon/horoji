@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "schema_version": "1.0.0",
+  "title": "Horoji Dependency Schema",
+  "description": "Schema for derived dependency artifacts produced by horoji-deps",
+  "type": "object",
+  "required": [
+    "provenance",
+    "subsystem",
+    "depends_on"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "provenance": {
+      "type": "object",
+      "description": "Provenance metadata block conforming to provenance.schema.json",
+      "required": [
+        "artifact_type",
+        "trust_level",
+        "generator",
+        "schema_version",
+        "input_commit",
+        "generated_at"
+      ],
+      "properties": {
+        "artifact_type": { "type": "string" },
+        "trust_level": { "type": "string", "enum": ["derived"] },
+        "generator": { "type": "string" },
+        "schema_version": { "type": "string" },
+        "input_commit": { "type": "string" },
+        "generated_at": { "type": "string" }
+      }
+    },
+    "subsystem": {
+      "type": "string",
+      "description": "Subsystem identifier"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Sorted list of subsystems this subsystem depends on (derived from imports)"
+    }
+  }
+}

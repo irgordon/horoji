@@ -1,0 +1,9 @@
+depends_on: []
+provenance:
+  artifact_type: dependency
+  generated_at: '2026-04-02T01:24:01Z'
+  generator: horoji-deps
+  input_commit: f92735f821547c3291f243441afd0a8a9f046935
+  schema_version: 1.0.0
+  trust_level: derived
+subsystem: horoji_cli
