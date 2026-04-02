@@ -98,6 +98,13 @@ def _resolve_deterministic_generated_at(repo_root: str) -> str:
     return "1970-01-01T00:00:00Z"
 
 
+def _resolve_deterministic_input_commit(repo_root: str) -> str:
+    result = _run_command(["git", "-C", repo_root, "rev-parse", "HEAD"], cwd=repo_root)
+    if result.returncode == 0 and result.stdout.strip():
+        return result.stdout.strip()
+    return "0000000000000000000000000000000000000000"
+
+
 def _check_bootstrap_presence(repo_root: str) -> list[str]:
     missing = []
     for rel_path in REQUIRED_DIRECTORIES + REQUIRED_SCHEMA_FILES + REQUIRED_CONFIG_FILES:
@@ -119,7 +126,7 @@ def _check_parseability(repo_root: str) -> list[str]:
                 data = json.load(fh)
             if not isinstance(data, dict):
                 malformed.append(f"{rel_path}: schema_root_not_mapping")
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, json.JSONDecodeError) as exc:
             malformed.append(f"{rel_path}: {exc}")
 
     for rel_path in REQUIRED_CONFIG_FILES:
@@ -129,7 +136,7 @@ def _check_parseability(repo_root: str) -> list[str]:
                 data = yaml.safe_load(fh)
             if not isinstance(data, dict):
                 malformed.append(f"{rel_path}: config_root_not_mapping")
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, yaml.YAMLError) as exc:
             malformed.append(f"{rel_path}: {exc}")
 
     return sorted(malformed)
@@ -339,6 +346,7 @@ def main() -> None:
 
     env = os.environ.copy()
     env.setdefault("HOROJI_GENERATED_AT", _resolve_deterministic_generated_at(repo_root))
+    env.setdefault("HOROJI_INPUT_COMMIT", _resolve_deterministic_input_commit(repo_root))
 
     stage_results: list[dict[str, Any]] = []
     changed_files: list[str] = []

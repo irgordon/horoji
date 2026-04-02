@@ -42,6 +42,7 @@ SCHEMA_FILE = os.path.join(MEMORY_ROOT, "schemas", "impact_set.schema.json")
 
 GENERATOR_NAME = "horoji-impact"
 GENERATED_AT_ENV = "HOROJI_GENERATED_AT"
+INPUT_COMMIT_ENV = "HOROJI_INPUT_COMMIT"
 
 # Canonical directory-to-subsystem mapping used to resolve files whose
 # ownership is not covered by an ownership artifact.
@@ -68,6 +69,9 @@ def fail(msg: str) -> None:
 # ---------------------------------------------------------------------------
 
 def get_input_commit() -> str:
+    override = os.environ.get(INPUT_COMMIT_ENV)
+    if override:
+        return override
     try:
         result = subprocess.run(
             ["git", "-C", REPO_ROOT, "rev-parse", "HEAD"],
@@ -227,7 +231,7 @@ def _preserve_existing_provenance(output_file: str, artifact: dict) -> dict:
     try:
         with open(output_file, "r", encoding="utf-8") as fh:
             existing = yaml.safe_load(fh)
-    except Exception:
+    except (OSError, yaml.YAMLError):
         return artifact
     if not isinstance(existing, dict):
         return artifact

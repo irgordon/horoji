@@ -35,6 +35,11 @@ def _make_temp_repo(tmp_path: Path) -> Path:
 
     shutil.copytree(Path(REPO_ROOT) / ".project_memory", repo / ".project_memory")
     shutil.copytree(Path(REPO_ROOT) / "tools", repo / "tools")
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.email", "ci@example.com"], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.name", "CI"], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=repo, check=True, capture_output=True, text=True)
     return repo
 
 
@@ -148,6 +153,7 @@ def test_validators_run_after_regeneration(tmp_path):
 def test_stale_derived_artifact_detection_fails_when_committed_policy_enabled(tmp_path):
     repo = _make_temp_repo(tmp_path)
     (repo / ".project_memory" / "derived" / "impact_sets" / "README_md.yaml").unlink()
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True, text=True)
 
     result = _run_ci_check(repo, "--changed-file", "README.md", "--derived-policy", "committed")
     assert result.returncode != 0

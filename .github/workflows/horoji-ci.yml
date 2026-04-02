@@ -1,11 +1,13 @@
 name: horoji-ci
 
-on:
+"on":
   pull_request:
 
 jobs:
   horoji-enforcement:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

@@ -8,6 +8,47 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — TASK_05: Deterministic CI Enforcement (Phase 5)
+
+- Added canonical CI enforcement entrypoint:
+  - `tools/horoji/cli/horoji-check`
+- Implemented deterministic TASK_05 stage orchestration in canonical order:
+  - `bootstrap_presence`
+  - `bootstrap_parseability`
+  - `changed_files`
+  - `invalidation`
+  - `regeneration`
+  - `validate_authoritative`
+  - `validate_derived`
+  - `validate_repository_invariants`
+  - `stale_artifact_check`
+  - `result`
+- Added explicit stage-local fail behavior with non-zero exit and structured machine-readable YAML output for each stage.
+- Added deterministic changed-file handling for CI entrypoint via:
+  - repeated `--changed-file`
+  - `--changed-files-file`
+  - explicit base/head SHA diff inputs
+- Added invalidation-driven regeneration enforcement:
+  - `horoji-callgraph` for `callgraphs`
+  - `horoji-deps` for `dependencies`
+  - `horoji-impact` for `impact_sets`
+- Added stale derived artifact detection policy support in CI entrypoint:
+  - `--derived-policy committed` (fails on dirty `.project_memory/derived` tree)
+  - `--derived-policy non_committed` (validated run-only policy)
+- Added pull request CI workflow:
+  - `.github/workflows/horoji-ci.yml`
+  - resolves changed files deterministically from PR base/head SHAs
+  - runs canonical `horoji-check` entrypoint
+  - runs `tests/horoji/` as repository-local verification
+- Added TASK_05 enforcement tests:
+  - `tests/horoji/test_ci_enforcement.py`
+  - verifies workflow presence/parseability, canonical entrypoint presence,
+    stage order stability, required negative bootstrap cases, invalidation consumption,
+    regeneration-before-validation, stale detection, and repeat-run logical consistency
+- Added deterministic CI-time provenance controls to generators:
+  - `HOROJI_GENERATED_AT` and `HOROJI_INPUT_COMMIT` environment overrides
+  - logical no-op preservation of existing `input_commit`/`generated_at` when regenerated content is unchanged
+
 ### Added — TASK_04: Deterministic Validators (Phase 4)
 
 - Added deterministic validator entrypoints under `tools/horoji/validators/`:
