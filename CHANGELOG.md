@@ -8,6 +8,39 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — TASK_03: Deterministic Invalidation Engine (Phase 3)
+
+- Created invalidation engine entrypoint at `tools/horoji/invalidation/horoji-invalidate`
+  with deterministic, repository-local invalidation computation.
+- Implemented explicit changed-file input handling through:
+  - repeated `--changed-file` arguments
+  - `--changed-files-file` containing one repository path per line
+- Implemented deterministic rule loading from
+  `.project_memory/config/invalidation_rules.yaml` with explicit failure behavior for:
+  - missing rules file
+  - malformed YAML
+  - invalid rule structure
+  - missing changed-file input
+- Implemented rule-driven invalidation computation:
+  - deterministic trigger matching with explicit path patterns
+  - deterministic deduped/stable `affected_artifacts` output ordering
+  - structured machine-readable YAML output under `invalidation_result`
+- Implemented conservative safety fallback behavior:
+  - unknown/unmatched change patterns trigger full regeneration
+  - uncertain scope expands to all required artifact classes
+- Populated `.project_memory/config/invalidation_rules.yaml` with explicit deterministic
+  rules for:
+  - scheduler source changes (`core/scheduler/**/*.c`) invalidating `impact_sets`
+  - header changes (`include/**/*.h`) invalidating `callgraphs`, `dependencies`,
+    and `impact_sets`
+- Added `tests/horoji/test_invalidation.py` covering:
+  - invalidation entrypoint/config existence and parseability
+  - required task cases (single source change, header change, unknown pattern fallback)
+  - deterministic output for identical inputs and normalized input ordering
+  - explicit changed-files-file input support
+  - explicit non-zero failures for missing input, missing/malformed rules, and invalid
+    rule structure
+
 ### Added — TASK_02: Deterministic Derived Artifact Generators (Phase 2)
 
 - Created three deterministic generator entrypoints under `tools/horoji/generators/`:
