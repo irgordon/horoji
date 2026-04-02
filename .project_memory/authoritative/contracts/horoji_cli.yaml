@@ -7,9 +7,11 @@ exports:
   - get-invariants
   - get-owner
   - get-impact-set
+  - get-context
   - validate
   - regenerate
   - invalidate
+  - log-agent-execution
 
 allowed_dependencies:
   - horoji_memory

@@ -8,6 +8,46 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — TASK_06: Deterministic Agent Integration (Phase 6)
+
+- Added deterministic Horoji CLI context interface entrypoint:
+  - `tools/horoji/cli/horoji`
+- Implemented required TASK_06 structured commands:
+  - `get-contract <subsystem>`
+  - `get-invariants <subsystem>`
+  - `get-owner <file>`
+  - `get-impact-set <file>`
+  - `get-context <subsystem>`
+  - `validate`
+- Added deterministic structured agent log command:
+  - `log-agent-execution`
+  - Emits stable machine-readable YAML with required fields:
+    - `agent.name`, `agent.version`
+    - `execution.timestamp`, `execution.subsystem`, `execution.action`
+    - `result.status`, `result.details`
+- Added reusable agent workflow templates under `.github/workflows/`:
+  - `agent-modify-subsystem.yml`
+  - `agent-generate-change.yml`
+  - `agent-validate-change.yml`
+- Workflow templates include required TASK_06 stages:
+  - context retrieval via `horoji get-context`
+  - agent invocation placeholder step producing proposed diff artifact
+  - deterministic validation via `horoji validate`
+  - CI enforcement via canonical `horoji-check`
+  - explicit failure handling and artifact logging
+- Added agent integration documentation:
+  - `docs/AGENT_INTEGRATION.md`
+  - Defines integration rules, context contract, workflow sequence, security constraints,
+    and local reproducibility commands
+- Added TASK_06 test suite:
+  - `tests/horoji/test_agent_integration.py`
+  - Verifies command structured outputs, stable context shape, workflow template presence
+    and sequencing, CI enforcement in templates, bypass prevention checks, deterministic
+    log output, and required negative cases
+- Updated authoritative CLI contract exports:
+  - `.project_memory/authoritative/contracts/horoji_cli.yaml`
+  - added `get-context` and `log-agent-execution`
+
 ### Added — TASK_05: Deterministic CI Enforcement (Phase 5)
 
 - Added canonical CI enforcement entrypoint:
