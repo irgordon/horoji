@@ -1,0 +1,23 @@
+schema_version: "1.0.0"
+
+subsystem: horoji_memory
+
+exports:
+  - read_contract
+  - read_invariant
+  - read_ownership
+  - read_architecture_manifest
+  - read_derived
+  - write_derived
+
+allowed_dependencies: []
+
+forbidden_dependencies:
+  - network
+  - external_filesystem
+  - horoji_cli
+  - horoji_validators
+  - horoji_generators
+  - horoji_invalidation
+
+owner: horoji_governance

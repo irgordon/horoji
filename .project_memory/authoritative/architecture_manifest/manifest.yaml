@@ -1,0 +1,25 @@
+schema_version: "1.0.0"
+
+subsystems:
+
+  horoji_memory:
+    depends_on: []
+
+  horoji_validators:
+    depends_on:
+      - horoji_memory
+
+  horoji_generators:
+    depends_on:
+      - horoji_memory
+
+  horoji_invalidation:
+    depends_on:
+      - horoji_memory
+
+  horoji_cli:
+    depends_on:
+      - horoji_memory
+      - horoji_validators
+      - horoji_generators
+      - horoji_invalidation

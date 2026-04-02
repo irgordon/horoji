@@ -1,0 +1,20 @@
+schema_version: "1.0.0"
+
+subsystem: horoji_validators
+
+exports:
+  - validate_contract
+  - validate_invariant
+  - validate_ownership
+
+allowed_dependencies:
+  - horoji_memory
+
+forbidden_dependencies:
+  - network
+  - external_filesystem
+  - horoji_cli
+  - horoji_generators
+  - horoji_invalidation
+
+owner: horoji_governance
