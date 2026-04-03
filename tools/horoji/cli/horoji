@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic Horoji CLI context interface (TASK_06)."""
+"""Deterministic Horoji CLI context interface."""
 
 from __future__ import annotations
 
@@ -14,21 +14,25 @@ import yaml
 
 
 def _repo_root(override: str | None) -> str:
+    """Resolve repository root deterministically."""
     if override:
         return os.path.abspath(override)
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 
 def _safe_dump(payload: dict[str, Any], stream: Any = sys.stdout) -> None:
+    """Emit deterministic YAML output."""
     yaml.safe_dump(payload, stream, sort_keys=True)
 
 
 def _emit_error(error_type: str, message: str) -> None:
+    """Emit structured error and exit non-zero."""
     _safe_dump({"error": {"type": error_type, "message": message}}, stream=sys.stderr)
     raise SystemExit(1)
 
 
 def _load_yaml(path: str, *, required: bool = True) -> Any:
+    """Load a YAML file deterministically."""
     if not os.path.isfile(path):
         if required:
             _emit_error("not_found", f"required file missing: {path}")
@@ -41,14 +45,17 @@ def _load_yaml(path: str, *, required: bool = True) -> Any:
 
 
 def _normalize_path(path: str) -> str:
+    """Normalize repository-relative path representation."""
     return path.strip().replace("\\", "/")
 
 
 def _safe_filename(path: str) -> str:
+    """Convert a repository path to a stable filename token."""
     return path.replace("/", "_").replace(".", "_")
 
 
 def _memory_dirs(repo_root: str) -> dict[str, str]:
+    """Return canonical Horoji memory directories."""
     memory_root = os.path.join(repo_root, ".project_memory")
     return {
         "contracts": os.path.join(memory_root, "authoritative", "contracts"),
@@ -61,6 +68,7 @@ def _memory_dirs(repo_root: str) -> dict[str, str]:
 
 
 def cmd_get_contract(repo_root: str, subsystem: str) -> None:
+    """Emit authoritative contract for a subsystem."""
     dirs = _memory_dirs(repo_root)
     path = os.path.join(dirs["contracts"], f"{subsystem}.yaml")
     contract = _load_yaml(path, required=False)
@@ -72,6 +80,7 @@ def cmd_get_contract(repo_root: str, subsystem: str) -> None:
 
 
 def cmd_get_invariants(repo_root: str, subsystem: str) -> None:
+    """Emit authoritative invariants for a subsystem."""
     dirs = _memory_dirs(repo_root)
     invariants_dir = dirs["invariants"]
     if not os.path.isdir(invariants_dir):
@@ -87,16 +96,40 @@ def cmd_get_invariants(repo_root: str, subsystem: str) -> None:
             _emit_error("invalid_structure", f"invariant root must be a mapping: {path}")
         if data.get("subsystem") == subsystem:
             items.append(data)
+
     _safe_dump({"subsystem": subsystem, "invariants": items})
 
 
+def _ownership_pattern(data: dict[str, Any]) -> str | None:
+    """
+    Resolve ownership pattern from current authoritative shape first,
+    with narrow backward compatibility for legacy top-level pattern.
+    """
+    resource = data.get("resource")
+    if isinstance(resource, dict):
+        pattern = resource.get("pattern")
+        if isinstance(pattern, str) and pattern:
+            return pattern
+        path = resource.get("path")
+        if isinstance(path, str) and path:
+            return path
+
+    legacy_pattern = data.get("pattern")
+    if isinstance(legacy_pattern, str) and legacy_pattern:
+        return legacy_pattern
+
+    return None
+
+
 def _resolve_owner(repo_root: str, file_path: str) -> tuple[str | None, str | None]:
+    """Resolve ownership record for a file path."""
     dirs = _memory_dirs(repo_root)
     ownership_dir = dirs["ownership"]
     if not os.path.isdir(ownership_dir):
         _emit_error("not_found", f"ownership directory missing: {ownership_dir}")
 
     normalized = _normalize_path(file_path)
+
     for name in sorted(os.listdir(ownership_dir)):
         if not name.endswith(".yaml"):
             continue
@@ -104,15 +137,19 @@ def _resolve_owner(repo_root: str, file_path: str) -> tuple[str | None, str | No
         data = _load_yaml(path, required=True)
         if not isinstance(data, dict):
             _emit_error("invalid_structure", f"ownership root must be a mapping: {path}")
-        pattern = data.get("pattern")
+
+        pattern = _ownership_pattern(data)
         owner = data.get("owner")
+
         if isinstance(pattern, str) and isinstance(owner, str):
             if fnmatch.fnmatch(normalized, pattern):
                 return owner, pattern
+
     return None, None
 
 
 def cmd_get_owner(repo_root: str, file_path: str) -> None:
+    """Emit owner mapping for a file path."""
     owner, pattern = _resolve_owner(repo_root, file_path)
     _safe_dump(
         {
@@ -124,6 +161,7 @@ def cmd_get_owner(repo_root: str, file_path: str) -> None:
 
 
 def cmd_get_impact_set(repo_root: str, file_path: str) -> None:
+    """Emit derived impact set for a file path."""
     dirs = _memory_dirs(repo_root)
     normalized = _normalize_path(file_path)
     path = os.path.join(dirs["impact_sets"], f"{_safe_filename(normalized)}.yaml")
@@ -136,8 +174,12 @@ def cmd_get_impact_set(repo_root: str, file_path: str) -> None:
 
 
 def _collect_subsystem_ownership(repo_root: str, subsystem: str) -> list[dict[str, Any]]:
+    """Collect ownership records owned by a subsystem."""
     dirs = _memory_dirs(repo_root)
     ownership_dir = dirs["ownership"]
+    if not os.path.isdir(ownership_dir):
+        return []
+
     items: list[dict[str, Any]] = []
     for name in sorted(os.listdir(ownership_dir)):
         if not name.endswith(".yaml"):
@@ -150,14 +192,17 @@ def _collect_subsystem_ownership(repo_root: str, subsystem: str) -> list[dict[st
             item = dict(data)
             item["_source"] = os.path.relpath(path, repo_root).replace(os.sep, "/")
             items.append(item)
+
     return items
 
 
 def _collect_impact_for_subsystem(repo_root: str, subsystem: str) -> list[dict[str, Any]]:
+    """Collect impact-set artifacts that reference a subsystem."""
     dirs = _memory_dirs(repo_root)
     impact_dir = dirs["impact_sets"]
     if not os.path.isdir(impact_dir):
         return []
+
     hits: list[dict[str, Any]] = []
     for name in sorted(os.listdir(impact_dir)):
         if not name.endswith(".yaml"):
@@ -166,16 +211,19 @@ def _collect_impact_for_subsystem(repo_root: str, subsystem: str) -> list[dict[s
         data = _load_yaml(path, required=True)
         if not isinstance(data, dict):
             _emit_error("invalid_structure", f"impact set root must be a mapping: {path}")
+
         impacted = data.get("impacted_subsystems", [])
         if isinstance(impacted, list) and subsystem in impacted:
             file_path = data.get("file", "")
             if not isinstance(file_path, str):
                 file_path = ""
             hits.append({"file": file_path, "artifact": data})
+
     return hits
 
 
 def _collect_history(repo_root: str) -> list[str]:
+    """Collect history artifact paths deterministically."""
     dirs = _memory_dirs(repo_root)
     history_root = dirs["history"]
     if not os.path.isdir(history_root):
@@ -187,11 +235,14 @@ def _collect_history(repo_root: str) -> list[str]:
         for name in sorted(file_names):
             rel = os.path.relpath(os.path.join(root, name), repo_root).replace(os.sep, "/")
             collected.append(rel)
+
     return collected
 
 
 def cmd_get_context(repo_root: str, subsystem: str) -> None:
+    """Emit deterministic aggregated context for a subsystem."""
     dirs = _memory_dirs(repo_root)
+
     contract_path = os.path.join(dirs["contracts"], f"{subsystem}.yaml")
     contract = _load_yaml(contract_path, required=False)
     if contract is None:
@@ -199,21 +250,20 @@ def cmd_get_context(repo_root: str, subsystem: str) -> None:
     if not isinstance(contract, dict):
         _emit_error("invalid_structure", f"contract root must be a mapping: {contract_path}")
 
-    invariants_payload = subprocess.run(
-        [sys.executable, __file__, "--repo-root", repo_root, "get-invariants", subsystem],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if invariants_payload.returncode != 0:
-        sys.stderr.write(invariants_payload.stderr)
-        raise SystemExit(invariants_payload.returncode)
-    parsed_invariants = yaml.safe_load(invariants_payload.stdout)
-    if not isinstance(parsed_invariants, dict):
-        _emit_error("invalid_structure", "invariants command produced malformed output")
-    invariants = parsed_invariants.get("invariants", [])
-    if not isinstance(invariants, list):
-        _emit_error("invalid_structure", "invariants field must be a list")
+    invariants_dir = dirs["invariants"]
+    if not os.path.isdir(invariants_dir):
+        _emit_error("not_found", f"invariants directory missing: {invariants_dir}")
+
+    invariants: list[dict[str, Any]] = []
+    for name in sorted(os.listdir(invariants_dir)):
+        if not name.endswith(".yaml"):
+            continue
+        path = os.path.join(invariants_dir, name)
+        data = _load_yaml(path, required=True)
+        if not isinstance(data, dict):
+            _emit_error("invalid_structure", f"invariant root must be a mapping: {path}")
+        if data.get("subsystem") == subsystem:
+            invariants.append(data)
 
     callgraph_path = os.path.join(dirs["callgraphs"], f"{subsystem}.yaml")
     callgraph_slice = _load_yaml(callgraph_path, required=False)
@@ -235,22 +285,27 @@ def cmd_get_context(repo_root: str, subsystem: str) -> None:
 
 
 def cmd_validate(repo_root: str) -> None:
+    """Delegate to the validator orchestrator."""
     validator = os.path.join(repo_root, "tools", "horoji", "validators", "validate-all")
     if not os.path.isfile(validator):
         _emit_error("not_found", f"validator entrypoint missing: {validator}")
+
     result = subprocess.run(
         [sys.executable, validator, "--repo-root", repo_root],
         capture_output=True,
         text=True,
         check=False,
     )
+
     output = result.stdout if result.stdout else result.stderr
     if output:
         sys.stdout.write(output)
+
     raise SystemExit(result.returncode)
 
 
 def cmd_log_agent_execution(args: argparse.Namespace) -> None:
+    """Emit deterministic structured agent execution log."""
     status = args.status.upper()
     if status not in {"SUCCESS", "FAILURE"}:
         _emit_error("input_error", "status must be SUCCESS or FAILURE")
@@ -274,6 +329,7 @@ def cmd_log_agent_execution(args: argparse.Namespace) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build CLI parser."""
     parser = argparse.ArgumentParser(description="Horoji deterministic CLI")
     parser.add_argument("--repo-root", help="Repository root path override")
 
@@ -297,7 +353,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("validate", help="Run deterministic repository validation")
 
     log_agent = subparsers.add_parser(
-        "log-agent-execution", help="Emit deterministic structured agent execution log"
+        "log-agent-execution",
+        help="Emit deterministic structured agent execution log",
     )
     log_agent.add_argument("--agent-name", required=True)
     log_agent.add_argument("--agent-version", required=True)
@@ -311,6 +368,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    """CLI entrypoint."""
     parser = build_parser()
     args = parser.parse_args()
     repo_root = _repo_root(args.repo_root)
@@ -336,6 +394,7 @@ def main() -> None:
     if args.command == "log-agent-execution":
         cmd_log_agent_execution(args)
         return
+
     _emit_error("input_error", f"unsupported command: {args.command}")
 
 
