@@ -9,15 +9,11 @@ exports:
   - get-impact-set
   - get-context
   - validate
-  - regenerate
-  - invalidate
   - log-agent-execution
 
 allowed_dependencies:
   - horoji_memory
   - horoji_validators
-  - horoji_generators
-  - horoji_invalidation
 
 forbidden_dependencies:
   - network
