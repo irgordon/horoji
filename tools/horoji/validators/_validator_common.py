@@ -11,6 +11,9 @@ from typing import Any
 
 import yaml
 
+EXPECTED_JSON_LOAD_ERRORS = (OSError, json.JSONDecodeError, ValueError)
+EXPECTED_YAML_LOAD_ERRORS = (OSError, yaml.YAMLError)
+
 
 def compute_repo_root(script_file: str, repo_root_override: str | None = None) -> str:
     if repo_root_override:

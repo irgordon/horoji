@@ -9,6 +9,7 @@ import os
 import sys
 
 from _validator_common import (
+    EXPECTED_YAML_LOAD_ERRORS,
     compute_repo_root,
     emit_yaml,
     load_yaml,
@@ -136,7 +137,7 @@ def contract_exports(repo_root: str, errors: list[str]) -> set[str]:
     path = os.path.join(repo_root, rel_path)
     try:
         data = load_yaml(path)
-    except Exception as exc:
+    except EXPECTED_YAML_LOAD_ERRORS as exc:
         errors.append(f"{rel_path}: {exc}")
         return set()
 

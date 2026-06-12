@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed — Validator Exception Boundaries
+
+- Replaced broad validator exception handling with narrow expected file,
+  JSON, YAML, and declared validation boundary errors.
+- Added regression coverage proving malformed validator inputs are reported
+  cleanly while unexpected validator implementation defects are not swallowed.
+
 ### Fixed — CI Derived Boundary
 
 - Updated `horoji-check` so committed derived artifacts are observed for

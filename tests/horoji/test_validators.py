@@ -2,10 +2,12 @@
 Validator tests for Horoji Phase 4 (TASK_04).
 """
 
+import importlib.util
 import os
 import shutil
 import subprocess
 import sys
+from importlib.machinery import SourceFileLoader
 
 import pytest
 import yaml
@@ -42,6 +44,20 @@ def parse_yaml_output(raw: str) -> dict:
     data = yaml.safe_load(raw)
     assert isinstance(data, dict), f"Expected mapping YAML output, got: {raw}"
     return data
+
+
+def load_validator_module(name: str):
+    loader = SourceFileLoader(name.replace("-", "_"), validator_path(name))
+    spec = importlib.util.spec_from_loader(name.replace("-", "_"), loader)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.path.insert(0, VALIDATORS_DIR)
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.pop(0)
+    return module
 
 
 def make_temp_repo(tmp_path) -> str:
@@ -122,6 +138,20 @@ def test_validate_contracts_fails_on_malformed_contract_artifact(tmp_path):
     data = parse_yaml_output(result.stdout)
     assert data["status"] == "ERROR"
     assert data["reason"] == "parse_error"
+
+
+def test_validate_contracts_reports_malformed_schema_configuration(tmp_path):
+    repo = make_temp_repo(tmp_path)
+    schema_file = os.path.join(repo, ".project_memory", "schemas", "contract.schema.json")
+    with open(schema_file, "w", encoding="utf-8") as fh:
+        fh.write("{broken\n")
+
+    result = run_validator("validate-contracts", repo_root=repo)
+
+    assert result.returncode != 0
+    data = parse_yaml_output(result.stdout)
+    assert data["status"] == "ERROR"
+    assert data["reason"] == "configuration_error"
 
 
 def test_validate_contracts_fails_on_overlapping_allowed_and_forbidden(tmp_path):
@@ -215,6 +245,26 @@ def test_validate_ownership_fails_on_malformed_ownership_artifact(tmp_path):
     assert data["reason"] == "parse_error"
 
 
+def test_validate_ownership_reports_malformed_contract_owner_source(tmp_path):
+    repo = make_temp_repo(tmp_path)
+    contract_file = os.path.join(
+        repo,
+        ".project_memory",
+        "authoritative",
+        "contracts",
+        "bad.yaml",
+    )
+    with open(contract_file, "w", encoding="utf-8") as fh:
+        fh.write("subsystem: [broken\n")
+
+    result = run_validator("validate-ownership", repo_root=repo)
+
+    assert result.returncode != 0
+    data = parse_yaml_output(result.stdout)
+    assert data["status"] == "ERROR"
+    assert data["reason"] == "contract_parse_error"
+
+
 def test_validate_ownership_fails_on_overlapping_conflicting_ownership(tmp_path):
     repo = make_temp_repo(tmp_path)
     overlap = os.path.join(repo, ".project_memory", "authoritative", "ownership", "conflict.yaml")
@@ -285,6 +335,19 @@ def test_validate_scheduler_non_blocking_fails_on_forbidden_call(tmp_path):
     assert out["status"] == "FAIL"
     assert out["reason"] == "blocking_call_detected"
     assert out["target"].endswith("scheduler_surface.py")
+
+
+def test_validate_contracts_does_not_swallow_unexpected_loader_bug(monkeypatch):
+    module = load_validator_module("validate-contracts")
+
+    def raise_unexpected_bug(_path):
+        raise RuntimeError("unexpected validator bug")
+
+    monkeypatch.setattr(module, "load_json", raise_unexpected_bug)
+    monkeypatch.setattr(sys, "argv", ["validate-contracts"])
+
+    with pytest.raises(RuntimeError, match="unexpected validator bug"):
+        module.main()
 
 
 def test_validate_determinism_fails_on_implicit_environment_read(tmp_path):

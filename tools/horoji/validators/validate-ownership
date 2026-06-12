@@ -8,6 +8,8 @@ import os
 import sys
 
 from _validator_common import (
+    EXPECTED_JSON_LOAD_ERRORS,
+    EXPECTED_YAML_LOAD_ERRORS,
     compute_repo_root,
     emit_yaml,
     is_valid_identifier,
@@ -63,7 +65,7 @@ def main() -> None:
 
     try:
         schema = load_json(schema_file)
-    except Exception as exc:
+    except EXPECTED_JSON_LOAD_ERRORS as exc:
         emit_yaml(
             make_result(
                 VALIDATOR,
@@ -79,8 +81,17 @@ def main() -> None:
     for contract_file in yaml_files_in(contracts_dir):
         try:
             contract_data = load_yaml(contract_file)
-        except Exception:
-            continue
+        except EXPECTED_YAML_LOAD_ERRORS as exc:
+            emit_yaml(
+                make_result(
+                    VALIDATOR,
+                    "ERROR",
+                    normalize_path(contract_file, repo_root),
+                    "contract_parse_error",
+                    [str(exc)],
+                )
+            )
+            sys.exit(1)
         if isinstance(contract_data, dict) and isinstance(contract_data.get("subsystem"), str):
             known_owners.add(contract_data["subsystem"])
 
@@ -103,7 +114,7 @@ def main() -> None:
         target = normalize_path(path, repo_root)
         try:
             data = load_yaml(path)
-        except Exception as exc:
+        except EXPECTED_YAML_LOAD_ERRORS as exc:
             emit_yaml(make_result(VALIDATOR, "ERROR", target, "parse_error", [str(exc)]))
             sys.exit(1)
 

@@ -1,0 +1,11 @@
+file: tools/horoji/validators/validate-scheduler_non_blocking
+impacted_subsystems:
+- horoji_cli
+- horoji_validators
+provenance:
+  artifact_type: impact_set
+  generated_at: '2026-06-12T01:34:06-04:00'
+  generator: horoji-impact
+  input_commit: b7ea2abcf75fa6a76e5f23886fea6ce65daad339
+  schema_version: 1.0.0
+  trust_level: derived

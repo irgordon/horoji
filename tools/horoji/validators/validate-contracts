@@ -8,6 +8,8 @@ import os
 import sys
 
 from _validator_common import (
+    EXPECTED_JSON_LOAD_ERRORS,
+    EXPECTED_YAML_LOAD_ERRORS,
     compute_repo_root,
     emit_yaml,
     is_valid_identifier,
@@ -35,7 +37,7 @@ def main() -> None:
 
     try:
         schema = load_json(schema_file)
-    except Exception as exc:
+    except EXPECTED_JSON_LOAD_ERRORS as exc:
         emit_yaml(
             make_result(
                 VALIDATOR,
@@ -63,7 +65,7 @@ def main() -> None:
         target = normalize_path(path, repo_root)
         try:
             data = load_yaml(path)
-        except Exception as exc:
+        except EXPECTED_YAML_LOAD_ERRORS as exc:
             emit_yaml(
                 make_result(VALIDATOR, "ERROR", target, "parse_error", [str(exc)])
             )
