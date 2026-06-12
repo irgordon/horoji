@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Production Roadmap
+
+- Added `docs/ROADMAP.md` documenting the v1.0.0 production roadmap.
+
 ### Added — Release Decision Record
 
 - Added `docs/releases/BASELINE-0.0.1-Decision.md` documenting the accepted
