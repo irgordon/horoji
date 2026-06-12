@@ -22,6 +22,13 @@ from _validator_common import (
 
 VALIDATOR = "validate-ownership"
 
+ACTIVE_TOOL_SURFACES = {
+    "tools/horoji/cli/**": "horoji_cli",
+    "tools/horoji/generators/**": "horoji_generators",
+    "tools/horoji/invalidation/**": "horoji_invalidation",
+    "tools/horoji/validators/**": "horoji_validators",
+}
+
 
 def _pattern_overlap(p1: str, p2: str) -> bool:
     if p1 == p2:
@@ -177,6 +184,21 @@ def main() -> None:
                     )
                 )
                 sys.exit(1)
+
+    for required_pattern, required_owner in sorted(ACTIVE_TOOL_SURFACES.items()):
+        if (required_pattern, required_owner) not in {
+            (pattern, owner) for _, pattern, owner in records
+        }:
+            emit_yaml(
+                make_result(
+                    VALIDATOR,
+                    "FAIL",
+                    ".project_memory/authoritative/ownership",
+                    "missing_active_tool_surface_ownership",
+                    [f"{required_pattern}:{required_owner}"],
+                )
+            )
+            sys.exit(1)
 
     emit_yaml(
         make_result(

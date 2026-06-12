@@ -8,6 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Active Tool Ownership
+
+- Added authoritative contracts for `horoji_generators` and `horoji_invalidation`.
+- Added ownership records for `tools/horoji/generators/**` and
+  `tools/horoji/invalidation/**`.
+- Added ownership validation requiring every active Horoji tool surface to have
+  an authoritative owner.
+- Added regression coverage for missing active tool ownership metadata.
+
 ### Added — Governance Coherence Validation
 
 - Added `validate-cli-contract` to compare the public CLI command set across

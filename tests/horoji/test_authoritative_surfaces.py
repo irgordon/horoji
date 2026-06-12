@@ -188,6 +188,23 @@ def test_contract_has_explicit_owner(contract_file):
     )
 
 
+def test_active_tool_surfaces_have_authoritative_contracts():
+    required_subsystems = {
+        "horoji_cli",
+        "horoji_generators",
+        "horoji_invalidation",
+        "horoji_validators",
+    }
+    actual_subsystems = set()
+    for contract_file in yaml_files_in(CONTRACTS_DIR):
+        with open(contract_file, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        actual_subsystems.add(data.get("subsystem"))
+
+    missing = sorted(required_subsystems - actual_subsystems)
+    assert missing == [], f"Missing contracts for active tool surfaces: {missing}"
+
+
 # ---------------------------------------------------------------------------
 # 3. Invariant schema validation
 # ---------------------------------------------------------------------------
@@ -253,6 +270,27 @@ def test_ownership_has_explicit_owner(ownership_file):
     assert data.get("owner"), (
         f"Ownership {ownership_file} must define a non-empty 'owner' field"
     )
+
+
+def test_active_tool_surfaces_have_authoritative_ownership():
+    required_ownership = {
+        "tools/horoji/cli/**": "horoji_cli",
+        "tools/horoji/generators/**": "horoji_generators",
+        "tools/horoji/invalidation/**": "horoji_invalidation",
+        "tools/horoji/validators/**": "horoji_validators",
+    }
+    actual_ownership = {}
+    for ownership_file in yaml_files_in(OWNERSHIP_DIR):
+        with open(ownership_file, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        actual_ownership[data.get("pattern")] = data.get("owner")
+
+    missing = {
+        pattern: owner
+        for pattern, owner in required_ownership.items()
+        if actual_ownership.get(pattern) != owner
+    }
+    assert missing == {}, f"Missing active tool ownership records: {missing}"
 
 
 # ---------------------------------------------------------------------------

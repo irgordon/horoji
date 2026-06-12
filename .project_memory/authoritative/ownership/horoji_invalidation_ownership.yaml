@@ -1,0 +1,8 @@
+schema_version: "1.0.0"
+
+pattern: "tools/horoji/invalidation/**"
+
+owner: horoji_invalidation
+
+review_required:
+  - horoji_governance

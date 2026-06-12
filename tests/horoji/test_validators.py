@@ -234,6 +234,25 @@ def test_validate_ownership_fails_on_overlapping_conflicting_ownership(tmp_path)
     assert data["reason"] == "overlapping_ownership_conflict"
 
 
+def test_validate_ownership_fails_when_active_tool_surface_is_unowned(tmp_path):
+    repo = make_temp_repo(tmp_path)
+    ownership_file = os.path.join(
+        repo,
+        ".project_memory",
+        "authoritative",
+        "ownership",
+        "horoji_generators_ownership.yaml",
+    )
+    os.remove(ownership_file)
+
+    result = run_validator("validate-ownership", repo_root=repo)
+    assert result.returncode != 0
+    data = parse_yaml_output(result.stdout)
+    assert data["status"] == "FAIL"
+    assert data["reason"] == "missing_active_tool_surface_ownership"
+    assert "tools/horoji/generators/**:horoji_generators" in data["details"]
+
+
 def test_validate_provenance_fails_on_missing_provenance(tmp_path):
     repo = make_temp_repo(tmp_path)
     artifact = os.path.join(repo, ".project_memory", "derived", "callgraphs", "horoji_cli.yaml")

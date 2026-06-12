@@ -327,6 +327,21 @@ Ownership conflicts must fail CI.
 
 ⸻
 
+9.1 Active Tool Surface Ownership
+
+Every active Horoji tool surface must have an authoritative contract and
+ownership record.
+
+The required first-generation tool owners are:
+	•	`tools/horoji/cli/**` owned by `horoji_cli`
+	•	`tools/horoji/generators/**` owned by `horoji_generators`
+	•	`tools/horoji/invalidation/**` owned by `horoji_invalidation`
+	•	`tools/horoji/validators/**` owned by `horoji_validators`
+
+Active behavior without a declared governance boundary is invalid.
+
+⸻
+
 10. Invalidation Engine
 
 The invalidation engine determines which derived artifacts must be regenerated.

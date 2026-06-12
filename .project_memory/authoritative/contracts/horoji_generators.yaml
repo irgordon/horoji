@@ -1,0 +1,20 @@
+schema_version: "1.0.0"
+
+subsystem: horoji_generators
+
+exports:
+  - horoji-callgraph
+  - horoji-deps
+  - horoji-impact
+
+allowed_dependencies:
+  - horoji_memory
+
+forbidden_dependencies:
+  - network
+  - external_filesystem
+  - horoji_cli
+  - horoji_validators
+  - horoji_invalidation
+
+owner: horoji_governance
