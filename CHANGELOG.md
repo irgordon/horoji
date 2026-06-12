@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Operator Surface Clarification
+
+- Expanded `README.md` with operator-focused guidance for Horoji purpose,
+  current status, repository layout, trust boundaries, public CLI commands,
+  internal orchestration surfaces, validation workflow, committed derived
+  policy, agent workflow, and governance document locations.
+
 ### Added — Determinism and Locality Hardening
 
 - Added `validate-determinism` to reject prohibited runtime sources in active
