@@ -15,6 +15,7 @@ from _validator_common import compute_repo_root, emit_yaml, make_result, normali
 VALIDATOR = "validate-all"
 ORDER = [
     "validate-contracts",
+    "validate-cli-contract",
     "validate-invariants",
     "validate-ownership",
     "validate-provenance",

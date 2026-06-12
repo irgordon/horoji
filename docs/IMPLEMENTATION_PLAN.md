@@ -67,7 +67,7 @@ If invalidation scope cannot be computed with confidence, Horoji must fall back 
 
 3. Phase Structure
 
-Implementation is divided into five bounded phases.
+The Horoji implementation is divided into seven ordered phases.
 
 No later phase may weaken guarantees established by an earlier phase.
 
@@ -441,9 +441,14 @@ horoji get-contract <subsystem>
 horoji get-invariants <subsystem>
 horoji get-owner <file>
 horoji get-impact-set <file>
+horoji get-context <subsystem>
 horoji validate
-horoji regenerate
-horoji invalidate
+horoji log-agent-execution
+
+Regeneration and invalidation are internal CI orchestration surfaces owned by
+`tools/horoji/cli/horoji-check`, `tools/horoji/generators/`, and
+`tools/horoji/invalidation/`. They are not public commands on
+`tools/horoji/cli/horoji` in the first-generation command surface.
 
 9.4 CLI behavior requirements
 

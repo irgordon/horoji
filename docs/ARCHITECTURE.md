@@ -7,6 +7,17 @@ Authority: Repository governance and CI verification pipeline
 
 ⸻
 
+0. Governance Documents
+
+Root `AGENTS.md` defines agent operating rules for this repository.
+
+`docs/CODING_STYLE.md` defines coding rules for Horoji implementation work.
+
+Both files are governance surfaces. They guide how changes are made, but they do
+not replace authoritative project memory artifacts under `.project_memory/`.
+
+⸻
+
 1. Purpose
 
 Horoji is a repository-resident project memory subsystem that exposes:
@@ -526,15 +537,19 @@ The CLI is the primary query surface.
 
 ⸻
 
-Required Commands
+Required Public Commands
 
 horoji get-contract <subsystem>
 horoji get-invariants <subsystem>
 horoji get-owner <file>
 horoji get-impact-set <file>
+horoji get-context <subsystem>
 horoji validate
-horoji regenerate
-horoji invalidate
+horoji log-agent-execution
+
+Regeneration and invalidation are internal CI orchestration surfaces. They are
+implemented through `horoji-check`, generator entrypoints, and the invalidation
+engine, not as public commands on the query CLI.
 
 
 ⸻

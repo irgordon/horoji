@@ -8,6 +8,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Governance Coherence Validation
+
+- Added `validate-cli-contract` to compare the public CLI command set across
+  `docs/ARCHITECTURE.md`, `docs/IMPLEMENTATION_PLAN.md`, the authoritative CLI
+  contract, and the CLI parser.
+- Added regression coverage for CLI command-surface drift.
+
+### Changed — Governance Coherence
+
+- Clarified that Horoji has seven ordered implementation phases, Phase 0 through
+  Phase 6.
+- Clarified that regeneration and invalidation are internal CI orchestration
+  surfaces, not public `horoji` query CLI commands.
+- Referenced root `AGENTS.md` and `docs/CODING_STYLE.md` as governance surfaces
+  from the architecture document.
+
+## [v0.0.0] - 2026-06-11
+
+### Added — Coding Style Guidance
+
+- Added `docs/CODING_STYLE.md` defining Horoji coding rules for simple control flow,
+  top-down readability, explicit trust boundaries, deterministic output,
+  repository locality, concrete tests, and Python good/bad examples.
+
 ### Added — TASK_06: Deterministic Agent Integration (Phase 6)
 
 - Added deterministic Horoji CLI context interface entrypoint:

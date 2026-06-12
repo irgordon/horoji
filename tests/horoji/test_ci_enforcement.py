@@ -34,6 +34,7 @@ def _make_temp_repo(tmp_path: Path) -> Path:
     repo.mkdir()
 
     shutil.copytree(Path(REPO_ROOT) / ".project_memory", repo / ".project_memory")
+    shutil.copytree(Path(REPO_ROOT) / "docs", repo / "docs")
     shutil.copytree(Path(REPO_ROOT) / "tools", repo / "tools")
     subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True, text=True)
     subprocess.run(["git", "config", "user.email", "ci@example.com"], cwd=repo, check=True, capture_output=True, text=True)

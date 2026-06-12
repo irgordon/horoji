@@ -1,0 +1,212 @@
+#!/usr/bin/env python3
+"""Validate CLI command-surface consistency across governance layers."""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import os
+import sys
+
+from _validator_common import (
+    compute_repo_root,
+    emit_yaml,
+    load_yaml,
+    make_result,
+    normalize_path,
+)
+
+VALIDATOR = "validate-cli-contract"
+
+ARCHITECTURE_COMMAND_HEADING = "Required Public Commands"
+PLAN_COMMAND_HEADING = "The first-generation CLI must support:"
+INTERNAL_SURFACE_MARKER = "Regeneration and invalidation are internal CI orchestration surfaces"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Validate Horoji CLI contract consistency")
+    parser.add_argument("--repo-root", help="Repository root override")
+    args = parser.parse_args()
+
+    repo_root = compute_repo_root(__file__, args.repo_root)
+
+    errors: list[str] = []
+    architecture_commands = documented_commands(
+        repo_root,
+        "docs/ARCHITECTURE.md",
+        ARCHITECTURE_COMMAND_HEADING,
+        errors,
+    )
+    plan_commands = documented_commands(
+        repo_root,
+        "docs/IMPLEMENTATION_PLAN.md",
+        PLAN_COMMAND_HEADING,
+        errors,
+    )
+    contract_commands = contract_exports(repo_root, errors)
+    parser_commands = cli_parser_commands(repo_root, errors)
+
+    command_sets = {
+        "docs/ARCHITECTURE.md": architecture_commands,
+        "docs/IMPLEMENTATION_PLAN.md": plan_commands,
+        ".project_memory/authoritative/contracts/horoji_cli.yaml": contract_commands,
+        "tools/horoji/cli/horoji": parser_commands,
+    }
+
+    if errors:
+        emit_yaml(make_result(VALIDATOR, "ERROR", "cli_command_surface", "cli_contract_unreadable", errors))
+        sys.exit(1)
+
+    mismatch_details = command_set_mismatches(command_sets)
+    if mismatch_details:
+        emit_yaml(
+            make_result(
+                VALIDATOR,
+                "FAIL",
+                "cli_command_surface",
+                "cli_command_sets_differ",
+                mismatch_details,
+            )
+        )
+        sys.exit(1)
+
+    commands = sorted(parser_commands)
+    emit_yaml(
+        make_result(
+            VALIDATOR,
+            "PASS",
+            "cli_command_surface",
+            "cli_command_sets_match",
+            [f"commands={','.join(commands)}"],
+        )
+    )
+
+
+def documented_commands(
+    repo_root: str,
+    rel_path: str,
+    heading: str,
+    errors: list[str],
+) -> set[str]:
+    path = os.path.join(repo_root, rel_path)
+    try:
+        text = read_text(path)
+    except OSError as exc:
+        errors.append(f"{rel_path}: {exc}")
+        return set()
+
+    commands = commands_after_heading(text, heading)
+    if not commands:
+        errors.append(f"{rel_path}: no CLI commands found after heading: {heading}")
+    return commands
+
+
+def commands_after_heading(text: str, heading: str) -> set[str]:
+    lines = text.splitlines()
+    commands: set[str] = set()
+    in_command_block = False
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped == heading:
+            in_command_block = True
+            continue
+        if not in_command_block:
+            continue
+        if stripped == INTERNAL_SURFACE_MARKER or stripped.startswith("Regeneration and invalidation"):
+            break
+        command = command_from_doc_line(stripped)
+        if command is not None:
+            commands.add(command)
+
+    return commands
+
+
+def command_from_doc_line(line: str) -> str | None:
+    if not line.startswith("horoji "):
+        return None
+    parts = line.split()
+    if len(parts) < 2:
+        return None
+    return parts[1]
+
+
+def contract_exports(repo_root: str, errors: list[str]) -> set[str]:
+    rel_path = ".project_memory/authoritative/contracts/horoji_cli.yaml"
+    path = os.path.join(repo_root, rel_path)
+    try:
+        data = load_yaml(path)
+    except Exception as exc:
+        errors.append(f"{rel_path}: {exc}")
+        return set()
+
+    exports = data.get("exports") if isinstance(data, dict) else None
+    if not isinstance(exports, list) or not all(isinstance(item, str) for item in exports):
+        errors.append(f"{rel_path}: exports must be a list of command strings")
+        return set()
+    return set(exports)
+
+
+def cli_parser_commands(repo_root: str, errors: list[str]) -> set[str]:
+    rel_path = "tools/horoji/cli/horoji"
+    path = os.path.join(repo_root, rel_path)
+    try:
+        text = read_text(path)
+    except OSError as exc:
+        errors.append(f"{rel_path}: {exc}")
+        return set()
+
+    try:
+        tree = ast.parse(text)
+    except SyntaxError as exc:
+        errors.append(f"{rel_path}: {exc}")
+        return set()
+
+    commands = argparse_subcommands(tree)
+    if not commands:
+        errors.append(f"{rel_path}: no argparse subcommands found")
+    return commands
+
+
+def argparse_subcommands(tree: ast.AST) -> set[str]:
+    commands: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr != "add_parser":
+            continue
+        if not node.args:
+            continue
+        command_arg = node.args[0]
+        if isinstance(command_arg, ast.Constant) and isinstance(command_arg.value, str):
+            commands.add(command_arg.value)
+    return commands
+
+
+def command_set_mismatches(command_sets: dict[str, set[str]]) -> list[str]:
+    if not command_sets:
+        return ["no_command_sets"]
+
+    canonical = next(iter(command_sets.values()))
+    details: list[str] = []
+
+    for source, commands in command_sets.items():
+        missing = sorted(canonical - commands)
+        extra = sorted(commands - canonical)
+        if missing:
+            details.append(f"{source}: missing={','.join(missing)}")
+        if extra:
+            details.append(f"{source}: extra={','.join(extra)}")
+
+    return details
+
+
+def read_text(path: str) -> str:
+    with open(path, "r", encoding="utf-8") as fh:
+        return fh.read()
+
+
+if __name__ == "__main__":
+    main()

@@ -15,6 +15,7 @@ VALIDATORS_DIR = os.path.join(REPO_ROOT, "tools", "horoji", "validators")
 
 REQUIRED_VALIDATORS = [
     "validate-contracts",
+    "validate-cli-contract",
     "validate-invariants",
     "validate-ownership",
     "validate-provenance",
@@ -46,8 +47,8 @@ def make_temp_repo(tmp_path) -> str:
     repo = tmp_path / "repo"
     repo.mkdir()
     shutil.copytree(os.path.join(REPO_ROOT, ".project_memory"), repo / ".project_memory")
-    tools_horoji = repo / "tools" / "horoji"
-    tools_horoji.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(os.path.join(REPO_ROOT, "docs"), repo / "docs")
+    shutil.copytree(os.path.join(REPO_ROOT, "tools"), repo / "tools")
     return str(repo)
 
 
@@ -65,6 +66,7 @@ def test_validator_entrypoint_is_readable(name):
     "name",
     [
         "validate-contracts",
+        "validate-cli-contract",
         "validate-invariants",
         "validate-ownership",
         "validate-provenance",
@@ -87,9 +89,10 @@ def test_validate_all_succeeds_and_aggregates_results():
     assert data["status"] == "PASS"
     assert data["reason"] == "all_validators_passed"
     results = data.get("results")
-    assert isinstance(results, list) and len(results) == 5
+    assert isinstance(results, list) and len(results) == 6
     expected_order = [
         "validate-contracts",
+        "validate-cli-contract",
         "validate-invariants",
         "validate-ownership",
         "validate-provenance",
@@ -139,6 +142,29 @@ def test_validate_contracts_fails_on_overlapping_allowed_and_forbidden(tmp_path)
     data = parse_yaml_output(result.stdout)
     assert data["status"] == "FAIL"
     assert data["reason"] == "dependency_sets_not_disjoint"
+
+
+def test_validate_cli_contract_fails_when_contract_exports_drift(tmp_path):
+    repo = make_temp_repo(tmp_path)
+    contract_file = os.path.join(
+        repo,
+        ".project_memory",
+        "authoritative",
+        "contracts",
+        "horoji_cli.yaml",
+    )
+    with open(contract_file, "r", encoding="utf-8") as fh:
+        contract = yaml.safe_load(fh)
+    contract["exports"].append("regenerate")
+    with open(contract_file, "w", encoding="utf-8") as fh:
+        yaml.safe_dump(contract, fh, sort_keys=False)
+
+    result = run_validator("validate-cli-contract", repo_root=repo)
+    assert result.returncode != 0
+    data = parse_yaml_output(result.stdout)
+    assert data["status"] == "FAIL"
+    assert data["reason"] == "cli_command_sets_differ"
+    assert any("extra=regenerate" in detail for detail in data["details"])
 
 
 def test_validate_invariants_fails_on_malformed_invariant_artifact(tmp_path):
