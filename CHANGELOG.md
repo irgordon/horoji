@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed — CI Derived Boundary
+
+- Updated `horoji-check` so committed derived artifacts are observed for
+  policy validation but are not passed to impact generation as primary
+  changed-file inputs.
+- Added regression coverage preventing nested impact artifacts for committed
+  derived impact artifacts.
+
 ### Added — Production Roadmap
 
 - Added `docs/ROADMAP.md` documenting the v1.0.0 production roadmap.

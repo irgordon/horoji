@@ -54,6 +54,8 @@ STAGE_ORDER = [
     "result",
 ]
 
+DERIVED_ARTIFACT_PREFIX = ".project_memory/derived/"
+
 
 class StageFailure(Exception):
     def __init__(self, stage: str, reason: str, details: list[str] | None = None):
@@ -87,6 +89,14 @@ def _normalize_changed_files(paths: list[str]) -> list[str]:
         if cleaned:
             normalized.append(cleaned.replace("\\", "/"))
     return sorted(set(normalized))
+
+
+def _is_derived_artifact_path(path: str) -> bool:
+    return path == ".project_memory/derived" or path.startswith(DERIVED_ARTIFACT_PREFIX)
+
+
+def _primary_changed_files(paths: list[str]) -> list[str]:
+    return [path for path in paths if not _is_derived_artifact_path(path)]
 
 
 def _resolve_deterministic_generated_at(repo_root: str) -> str:
@@ -366,6 +376,7 @@ def main() -> None:
 
     stage_results: list[dict[str, Any]] = []
     changed_files: list[str] = []
+    primary_changed_files: list[str] = []
     affected_artifacts: list[str] = []
 
     try:
@@ -380,11 +391,14 @@ def main() -> None:
         stage_results.append(emit_stage("bootstrap_parseability", "PASS", "bootstrap_parseable"))
 
         changed_files = _compute_changed_files(args, repo_root)
+        primary_changed_files = _primary_changed_files(changed_files)
+        if not primary_changed_files:
+            raise StageFailure("changed_files", "primary_changed_files_unavailable", changed_files)
         stage_results.append(
             emit_stage("changed_files", "PASS", "changed_files_resolved", [f"count={len(changed_files)}", *changed_files])
         )
 
-        invalidation_result, affected_artifacts = _run_invalidation(repo_root, changed_files)
+        invalidation_result, affected_artifacts = _run_invalidation(repo_root, primary_changed_files)
         stage_results.append(
             emit_stage(
                 "invalidation",
@@ -397,7 +411,7 @@ def main() -> None:
             )
         )
 
-        invoked = _regenerate(repo_root, affected_artifacts, changed_files, provenance_args)
+        invoked = _regenerate(repo_root, affected_artifacts, primary_changed_files, provenance_args)
         stage_results.append(
             emit_stage("regeneration", "PASS", "required_regeneration_completed", invoked)
         )

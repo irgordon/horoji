@@ -1,0 +1,9 @@
+file: tests/horoji/test_ci_enforcement.py
+impacted_subsystems: []
+provenance:
+  artifact_type: impact_set
+  generated_at: '2026-06-11T22:40:27-04:00'
+  generator: horoji-impact
+  input_commit: 857219d25208a1f71e91e749d7b8f457a9df9bd3
+  schema_version: 1.0.0
+  trust_level: derived

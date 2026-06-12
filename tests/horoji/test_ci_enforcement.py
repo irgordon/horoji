@@ -2,10 +2,12 @@
 CI enforcement tests for Horoji Phase 5 (TASK_05).
 """
 
+import importlib.util
 import os
 import shutil
 import subprocess
 import sys
+from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
 import pytest
@@ -61,6 +63,16 @@ def _run_ci_check(repo_root: Path, *args: str) -> subprocess.CompletedProcess:
 def _parse_stage_docs(raw: str) -> list[dict]:
     docs = [doc for doc in yaml.safe_load_all(raw) if isinstance(doc, dict)]
     return docs
+
+
+def _load_ci_check_module():
+    loader = SourceFileLoader("horoji_check", CLI_CHECK)
+    spec = importlib.util.spec_from_loader("horoji_check", loader)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_ci_workflow_file_exists_and_parses():
@@ -163,6 +175,68 @@ def test_stale_derived_artifact_detection_fails_when_committed_policy_enabled(tm
     stale = next(doc for doc in docs if doc["stage"] == "stale_artifact_check")
     assert stale["status"] == "FAIL"
     assert stale["reason"] == "stale_derived_artifacts_detected"
+
+
+def test_primary_changed_files_exclude_derived_artifacts():
+    module = _load_ci_check_module()
+    changed_files = [
+        ".project_memory/derived/impact_sets/docs_ROADMAP_md.yaml",
+        ".project_memory/authoritative/contracts/horoji_cli.yaml",
+        "docs/ROADMAP.md",
+    ]
+
+    primary = module._primary_changed_files(changed_files)
+
+    assert primary == [
+        ".project_memory/authoritative/contracts/horoji_cli.yaml",
+        "docs/ROADMAP.md",
+    ]
+
+
+def test_auto_diff_does_not_generate_impact_for_committed_derived_artifact(tmp_path):
+    repo = _make_temp_repo(tmp_path)
+    roadmap = repo / "docs" / "ROADMAP.md"
+    impact = repo / ".project_memory" / "derived" / "impact_sets" / "docs_ROADMAP_md.yaml"
+    nested_impact = (
+        repo
+        / ".project_memory"
+        / "derived"
+        / "impact_sets"
+        / "_project_memory_derived_impact_sets_docs_ROADMAP_md_yaml.yaml"
+    )
+
+    roadmap.write_text(
+        roadmap.read_text(encoding="utf-8") + "\nRegression fixture change.\n",
+        encoding="utf-8",
+    )
+    artifact = yaml.safe_load(impact.read_text(encoding="utf-8"))
+    artifact["provenance"]["generated_at"] = "2001-01-01T00:00:00Z"
+    impact.write_text(yaml.safe_dump(artifact, sort_keys=True), encoding="utf-8")
+    subprocess.run(
+        ["git", "add", "-A"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "change roadmap with derived artifact"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    result = _run_ci_check(repo, "--auto-diff", "--derived-policy", "committed")
+
+    assert result.returncode == 0, result.stdout + "\n" + result.stderr
+    assert not nested_impact.exists()
+    docs = _parse_stage_docs(result.stdout)
+    changed = next(doc for doc in docs if doc["stage"] == "changed_files")
+    assert "docs/ROADMAP.md" in changed["details"]
+    assert ".project_memory/derived/impact_sets/docs_ROADMAP_md.yaml" in changed["details"]
+    stale = next(doc for doc in docs if doc["stage"] == "stale_artifact_check")
+    assert stale["status"] == "PASS"
 
 
 def test_deterministic_logical_outcomes_for_repeated_runs(tmp_path):
