@@ -1,0 +1,9 @@
+file: docs/releases/BASELINE-0.0.1-Decision.md
+impacted_subsystems: []
+provenance:
+  artifact_type: impact_set
+  generated_at: '2026-06-11T22:22:21-04:00'
+  generator: horoji-impact
+  input_commit: eac9a1c2f94699d6ae631ff2be428f15a6f62490
+  schema_version: 1.0.0
+  trust_level: derived

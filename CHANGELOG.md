@@ -8,6 +8,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Release Decision Record
+
+- Added `docs/releases/BASELINE-0.0.1-Decision.md` documenting the accepted
+  coherent governed baseline after the P0-P6 recovery and audit sequence.
+
 ### Added — Operator Surface Clarification
 
 - Expanded `README.md` with operator-focused guidance for Horoji purpose,
