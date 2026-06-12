@@ -4,8 +4,12 @@ subsystem: horoji_validators
 
 exports:
   - validate_contract
+  - validate_determinism
   - validate_invariant
   - validate_ownership
+  - validate_provenance
+  - validate_scheduler_non_blocking
+  - validate_all
 
 allowed_dependencies:
   - horoji_memory

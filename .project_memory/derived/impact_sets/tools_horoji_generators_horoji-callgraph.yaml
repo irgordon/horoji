@@ -1,0 +1,11 @@
+file: tools/horoji/generators/horoji-callgraph
+impacted_subsystems:
+- horoji_cli
+- horoji_generators
+provenance:
+  artifact_type: impact_set
+  generated_at: '2026-06-11T22:07:57-04:00'
+  generator: horoji-impact
+  input_commit: d829ef79c2e0066600dcf439ef0ff27ac0227b49
+  schema_version: 1.0.0
+  trust_level: derived

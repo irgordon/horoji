@@ -1,0 +1,27 @@
+schema_version: "1.0.0"
+
+id: horoji_determinism_boundary
+
+subsystem: horoji_validators
+
+description: >-
+  Active Horoji tools must not derive repository artifacts or validation
+  outcomes from implicit environment reads, host filesystem discovery,
+  network access, wall-clock time, random values, or nondeterministic
+  serialization.
+
+enforcement:
+  ast_query:
+    forbidden_calls:
+      - os.environ
+      - os.getenv
+      - Path.home
+      - requests
+      - urllib
+      - http.client
+      - socket
+      - random
+      - uuid
+      - datetime.now
+      - datetime.utcnow
+      - time.time

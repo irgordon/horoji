@@ -52,10 +52,16 @@ All derived artifacts must be reproducible from:
 	•	repository content
 	•	pinned toolchain
 	•	explicit configuration
+	•	declared CI inputs passed through approved entrypoints
 
 Given identical inputs, outputs must be identical.
 
 No stochastic generation is permitted in enforcement paths.
+
+Explicit CI inputs include repository revision and generation timestamp values
+resolved by `tools/horoji/cli/horoji-check` and passed to generators as command
+arguments. Generators and validators must not discover those values by reading
+process environment variables.
 
 ⸻
 
@@ -92,6 +98,13 @@ It must not:
 	•	query system configuration
 	•	download external artifacts
 	•	rely on environment discovery
+
+Allowed inputs are explicit CLI arguments, explicit configuration files inside
+the repository, pinned toolchain files, and declared CI inputs passed through
+approved entrypoints. Horoji tools must not use current working directory,
+home-directory discovery, temporary host locations, network access, downloads,
+random values, wall-clock reads, or unordered serialized iteration as hidden
+authority for derived artifacts or validation results.
 
 ⸻
 

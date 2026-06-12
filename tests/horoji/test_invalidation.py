@@ -3,6 +3,7 @@ Invalidation engine tests for Horoji Phase 3 (TASK_03).
 """
 
 import os
+import shutil
 import subprocess
 import sys
 import textwrap
@@ -31,17 +32,23 @@ def run_invalidator(*extra_args: str) -> subprocess.CompletedProcess:
     )
 
 
-def run_invalidator_with_env(
-    extra_env: dict[str, str], *extra_args: str
-) -> subprocess.CompletedProcess:
-    env = os.environ.copy()
-    env.update(extra_env)
+def run_temp_invalidator(repo: str, *extra_args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, invalidation_path("horoji-invalidate"), *extra_args],
+        [
+            sys.executable,
+            os.path.join(repo, "tools", "horoji", "invalidation", "horoji-invalidate"),
+            *extra_args,
+        ],
         capture_output=True,
         text=True,
-        env=env,
     )
+
+
+def make_temp_invalidation_repo(tmp_path) -> str:
+    repo = tmp_path / "repo"
+    shutil.copytree(os.path.join(REPO_ROOT, "tools"), repo / "tools")
+    shutil.copytree(os.path.join(REPO_ROOT, ".project_memory", "config"), repo / ".project_memory" / "config")
+    return str(repo)
 
 
 def parse_yaml_output(raw: str) -> dict:
@@ -165,47 +172,41 @@ def test_fails_when_changed_files_input_is_missing():
 
 
 def test_fails_when_rules_file_is_missing(tmp_path):
-    result = run_invalidator_with_env(
-        {"HOROJI_INVALIDATION_RULES_FILE": str(tmp_path / "missing.yaml")},
-        "--changed-file",
-        "include/scheduler.h",
-    )
+    repo = make_temp_invalidation_repo(tmp_path)
+    os.remove(os.path.join(repo, ".project_memory", "config", "invalidation_rules.yaml"))
+
+    result = run_temp_invalidator(repo, "--changed-file", "include/scheduler.h")
     assert result.returncode != 0
     assert "configuration_error" in result.stderr
 
 
 def test_fails_when_rules_file_is_malformed(tmp_path):
-    bad_rules = tmp_path / "bad_rules.yaml"
-    bad_rules.write_text("rules: [unclosed\n", encoding="utf-8")
+    repo = make_temp_invalidation_repo(tmp_path)
+    bad_rules = os.path.join(repo, ".project_memory", "config", "invalidation_rules.yaml")
+    with open(bad_rules, "w", encoding="utf-8") as fh:
+        fh.write("rules: [unclosed\n")
 
-    result = run_invalidator_with_env(
-        {"HOROJI_INVALIDATION_RULES_FILE": str(bad_rules)},
-        "--changed-file",
-        "include/scheduler.h",
-    )
+    result = run_temp_invalidator(repo, "--changed-file", "include/scheduler.h")
     assert result.returncode != 0
     assert "configuration_error" in result.stderr
 
 
 def test_fails_when_rule_structure_is_invalid(tmp_path):
-    bad_rules = tmp_path / "bad_structure.yaml"
-    bad_rules.write_text(
-        textwrap.dedent(
-            """\
-            schema_version: "1.0.0"
-            rules:
-              - trigger: "include/**/*.h"
-                invalidate:
-                  - callgraphs
-            """
-        ),
-        encoding="utf-8",
-    )
+    repo = make_temp_invalidation_repo(tmp_path)
+    bad_rules = os.path.join(repo, ".project_memory", "config", "invalidation_rules.yaml")
+    with open(bad_rules, "w", encoding="utf-8") as fh:
+        fh.write(
+            textwrap.dedent(
+                """\
+                schema_version: "1.0.0"
+                rules:
+                  - trigger: "include/**/*.h"
+                    invalidate:
+                      - callgraphs
+                """
+            )
+        )
 
-    result = run_invalidator_with_env(
-        {"HOROJI_INVALIDATION_RULES_FILE": str(bad_rules)},
-        "--changed-file",
-        "include/scheduler.h",
-    )
+    result = run_temp_invalidator(repo, "--changed-file", "include/scheduler.h")
     assert result.returncode != 0
     assert "configuration_error" in result.stderr

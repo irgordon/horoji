@@ -43,6 +43,17 @@ It must not:
 	•	download tools or metadata
 	•	rely on environment discovery for correctness
 
+Allowed implementation inputs are:
+	•	explicit CLI arguments
+	•	explicit configuration files inside the repository
+	•	pinned toolchain files
+	•	declared CI inputs passed through approved entrypoints
+
+Implicit `os.environ` or `os.getenv` reads inside generators, validators, and
+invalidation logic are forbidden. CI-provided values such as repository
+revision and generation timestamp must be resolved by the approved orchestration
+entrypoint and passed to generators explicitly.
+
 2.2 Determinism
 
 All enforcement and regeneration paths must be deterministic.
@@ -375,6 +386,7 @@ Implement deterministic validation of authoritative metadata and selected reposi
 
 Implement under tools/horoji/validators/:
 	•	validate-contracts
+	•	validate-determinism
 	•	validate-invariants
 	•	validate-ownership
 	•	at least one concrete invariant validator such as validate-scheduler_non_blocking

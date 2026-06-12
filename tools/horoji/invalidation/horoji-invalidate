@@ -11,7 +11,6 @@ import yaml
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 MEMORY_ROOT = os.path.join(REPO_ROOT, ".project_memory")
 RULES_FILE = os.path.join(MEMORY_ROOT, "config", "invalidation_rules.yaml")
-RULES_FILE_ENV = "HOROJI_INVALIDATION_RULES_FILE"
 
 ENGINE_NAME = "horoji-invalidate"
 ALL_DERIVED_ARTIFACT_CLASSES = ["callgraphs", "dependencies", "impact_sets"]
@@ -34,7 +33,7 @@ def normalize_changed_files(paths: list[str]) -> list[str]:
 
 
 def load_rules() -> list[dict]:
-    rules_file = os.environ.get(RULES_FILE_ENV, RULES_FILE)
+    rules_file = RULES_FILE
     if not os.path.isfile(rules_file):
         emit_error("configuration_error", "invalidation rules file missing")
     try:

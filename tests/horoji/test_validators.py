@@ -20,6 +20,7 @@ REQUIRED_VALIDATORS = [
     "validate-ownership",
     "validate-provenance",
     "validate-scheduler_non_blocking",
+    "validate-determinism",
     "validate-all",
 ]
 
@@ -71,6 +72,7 @@ def test_validator_entrypoint_is_readable(name):
         "validate-ownership",
         "validate-provenance",
         "validate-scheduler_non_blocking",
+        "validate-determinism",
     ],
 )
 def test_validator_succeeds_on_valid_repository_state(name):
@@ -89,7 +91,7 @@ def test_validate_all_succeeds_and_aggregates_results():
     assert data["status"] == "PASS"
     assert data["reason"] == "all_validators_passed"
     results = data.get("results")
-    assert isinstance(results, list) and len(results) == 6
+    assert isinstance(results, list) and len(results) == 7
     expected_order = [
         "validate-contracts",
         "validate-cli-contract",
@@ -97,6 +99,7 @@ def test_validate_all_succeeds_and_aggregates_results():
         "validate-ownership",
         "validate-provenance",
         "validate-scheduler_non_blocking",
+        "validate-determinism",
     ]
     assert [item.get("validator") for item in results] == expected_order
 
@@ -282,6 +285,75 @@ def test_validate_scheduler_non_blocking_fails_on_forbidden_call(tmp_path):
     assert out["status"] == "FAIL"
     assert out["reason"] == "blocking_call_detected"
     assert out["target"].endswith("scheduler_surface.py")
+
+
+def test_validate_determinism_fails_on_implicit_environment_read(tmp_path):
+    repo = make_temp_repo(tmp_path)
+    bad_file = os.path.join(repo, "tools", "horoji", "generators", "bad-env")
+    with open(bad_file, "w", encoding="utf-8") as fh:
+        fh.write("import os\nVALUE = os.environ['HOROJI_INPUT_COMMIT']\n")
+
+    result = run_validator("validate-determinism", repo_root=repo)
+    assert result.returncode != 0
+    out = parse_yaml_output(result.stdout)
+    assert out["status"] == "FAIL"
+    assert out["reason"] == "prohibited_runtime_source_detected"
+    assert any("implicit_environment_read" in detail for detail in out["details"])
+
+
+def test_validate_determinism_fails_on_network_dependency(tmp_path):
+    repo = make_temp_repo(tmp_path)
+    bad_file = os.path.join(repo, "tools", "horoji", "validators", "bad-network")
+    with open(bad_file, "w", encoding="utf-8") as fh:
+        fh.write("import urllib.request\nurllib.request.urlopen('https://example.invalid')\n")
+
+    result = run_validator("validate-determinism", repo_root=repo)
+    assert result.returncode != 0
+    out = parse_yaml_output(result.stdout)
+    assert out["status"] == "FAIL"
+    assert any("network_dependency" in detail for detail in out["details"])
+
+
+def test_validate_determinism_fails_on_host_filesystem_discovery(tmp_path):
+    repo = make_temp_repo(tmp_path)
+    bad_file = os.path.join(repo, "tools", "horoji", "cli", "bad-home")
+    with open(bad_file, "w", encoding="utf-8") as fh:
+        fh.write("from pathlib import Path\nHOME = Path.home()\n")
+
+    result = run_validator("validate-determinism", repo_root=repo)
+    assert result.returncode != 0
+    out = parse_yaml_output(result.stdout)
+    assert out["status"] == "FAIL"
+    assert any("host_home_discovery" in detail for detail in out["details"])
+
+
+def test_validate_determinism_fails_on_runtime_nondeterminism(tmp_path):
+    repo = make_temp_repo(tmp_path)
+    bad_file = os.path.join(repo, "tools", "horoji", "invalidation", "bad-time")
+    with open(bad_file, "w", encoding="utf-8") as fh:
+        fh.write("import datetime\nSTAMP = datetime.datetime.now()\n")
+
+    result = run_validator("validate-determinism", repo_root=repo)
+    assert result.returncode != 0
+    out = parse_yaml_output(result.stdout)
+    assert out["status"] == "FAIL"
+    assert any("wall_clock_time" in detail for detail in out["details"])
+
+
+def test_validate_determinism_allows_explicit_argument_inputs(tmp_path):
+    repo = make_temp_repo(tmp_path)
+    good_file = os.path.join(repo, "tools", "horoji", "generators", "good-explicit")
+    with open(good_file, "w", encoding="utf-8") as fh:
+        fh.write(
+            "import argparse\n"
+            "parser = argparse.ArgumentParser()\n"
+            "parser.add_argument('--input-commit')\n"
+        )
+
+    result = run_validator("validate-determinism", repo_root=repo)
+    assert result.returncode == 0, result.stdout + result.stderr
+    out = parse_yaml_output(result.stdout)
+    assert out["status"] == "PASS"
 
 
 def test_validator_output_shape_is_machine_readable():

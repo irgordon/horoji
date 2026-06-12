@@ -20,6 +20,7 @@ ORDER = [
     "validate-ownership",
     "validate-provenance",
     "validate-scheduler_non_blocking",
+    "validate-determinism",
 ]
 
 

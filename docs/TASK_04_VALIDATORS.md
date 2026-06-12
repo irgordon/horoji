@@ -105,6 +105,7 @@ tools/horoji/validators/
 Required:
 
 validate-contracts
+validate-determinism
 validate-invariants
 validate-ownership
 validate-provenance
@@ -244,6 +245,12 @@ Validators must not depend on:
 	•	host environment discovery
 	•	network access
 	•	user-specific mutable state outside explicit repository inputs
+
+`validate-determinism` enforces this boundary for active Horoji tool and CI
+surfaces. It rejects implicit environment reads, home-directory discovery,
+temporary host dependencies, network dependencies, random identifiers,
+wall-clock reads, current-working-directory authority, and detectable
+nondeterministic serialization.
 
 ⸻
 

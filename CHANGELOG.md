@@ -8,6 +8,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Determinism and Locality Hardening
+
+- Added `validate-determinism` to reject prohibited runtime sources in active
+  Horoji tool and CI surfaces.
+- Added an authoritative `horoji_determinism_boundary` invariant.
+- Added regression coverage for implicit environment reads, network behavior,
+  host filesystem discovery, runtime nondeterminism, and approved explicit
+  argument inputs.
+
+### Changed — Determinism and Locality Hardening
+
+- Replaced generator provenance environment overrides with explicit
+  `--input-commit` and `--generated-at` arguments passed by `horoji-check`.
+- Removed invalidation rules file environment discovery; invalidation now reads
+  the repository-local config path.
+- Documented the P4 explicit input rule for repository content, pinned tools,
+  repository config, and declared CI inputs.
+
 ### Added — Active Tool Ownership
 
 - Added authoritative contracts for `horoji_generators` and `horoji_invalidation`.

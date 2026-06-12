@@ -193,13 +193,13 @@ def _compute_changed_files(args: argparse.Namespace, repo_root: str) -> list[str
     return normalized
 
 
-def _run_invalidation(repo_root: str, changed_files: list[str], env: dict[str, str]) -> tuple[dict[str, Any], list[str]]:
+def _run_invalidation(repo_root: str, changed_files: list[str]) -> tuple[dict[str, Any], list[str]]:
     invalidation_script = os.path.join(repo_root, "tools", "horoji", "invalidation", "horoji-invalidate")
     cmd = [sys.executable, invalidation_script]
     for path in changed_files:
         cmd.extend(["--changed-file", path])
 
-    result = _run_command(cmd, cwd=repo_root, env=env)
+    result = _run_command(cmd, cwd=repo_root)
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
         raise StageFailure("invalidation", "invalidation_failed", [detail])
@@ -220,30 +220,43 @@ def _run_invalidation(repo_root: str, changed_files: list[str], env: dict[str, s
     return invalidation_result, sorted(set(affected_artifacts))
 
 
-def _run_generator(repo_root: str, script_name: str, extra_args: list[str], env: dict[str, str]) -> None:
+def _run_generator(
+    repo_root: str,
+    script_name: str,
+    extra_args: list[str],
+    provenance_args: list[str],
+) -> None:
     script = os.path.join(repo_root, "tools", "horoji", "generators", script_name)
-    result = _run_command([sys.executable, script, *extra_args], cwd=repo_root, env=env)
+    result = _run_command(
+        [sys.executable, script, *extra_args, *provenance_args],
+        cwd=repo_root,
+    )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
         raise StageFailure("regeneration", f"generator_failed:{script_name}", [detail])
 
 
-def _regenerate(repo_root: str, affected_artifacts: list[str], changed_files: list[str], env: dict[str, str]) -> list[str]:
+def _regenerate(
+    repo_root: str,
+    affected_artifacts: list[str],
+    changed_files: list[str],
+    provenance_args: list[str],
+) -> list[str]:
     invoked: list[str] = []
 
     if "callgraphs" in affected_artifacts:
-        _run_generator(repo_root, "horoji-callgraph", [], env)
+        _run_generator(repo_root, "horoji-callgraph", [], provenance_args)
         invoked.append("horoji-callgraph")
 
     if "dependencies" in affected_artifacts:
-        _run_generator(repo_root, "horoji-deps", [], env)
+        _run_generator(repo_root, "horoji-deps", [], provenance_args)
         invoked.append("horoji-deps")
 
     if "impact_sets" in affected_artifacts:
         args: list[str] = []
         for path in changed_files:
             args.extend(["--file", path])
-        _run_generator(repo_root, "horoji-impact", args, env)
+        _run_generator(repo_root, "horoji-impact", args, provenance_args)
         invoked.append("horoji-impact")
 
     if not invoked:
@@ -344,9 +357,12 @@ def main() -> None:
     args = build_parser().parse_args()
     repo_root = os.path.abspath(args.repo_root)
 
-    env = os.environ.copy()
-    env.setdefault("HOROJI_GENERATED_AT", _resolve_deterministic_generated_at(repo_root))
-    env.setdefault("HOROJI_INPUT_COMMIT", _resolve_deterministic_input_commit(repo_root))
+    provenance_args = [
+        "--generated-at",
+        _resolve_deterministic_generated_at(repo_root),
+        "--input-commit",
+        _resolve_deterministic_input_commit(repo_root),
+    ]
 
     stage_results: list[dict[str, Any]] = []
     changed_files: list[str] = []
@@ -368,7 +384,7 @@ def main() -> None:
             emit_stage("changed_files", "PASS", "changed_files_resolved", [f"count={len(changed_files)}", *changed_files])
         )
 
-        invalidation_result, affected_artifacts = _run_invalidation(repo_root, changed_files, env)
+        invalidation_result, affected_artifacts = _run_invalidation(repo_root, changed_files)
         stage_results.append(
             emit_stage(
                 "invalidation",
@@ -381,7 +397,7 @@ def main() -> None:
             )
         )
 
-        invoked = _regenerate(repo_root, affected_artifacts, changed_files, env)
+        invoked = _regenerate(repo_root, affected_artifacts, changed_files, provenance_args)
         stage_results.append(
             emit_stage("regeneration", "PASS", "required_regeneration_completed", invoked)
         )

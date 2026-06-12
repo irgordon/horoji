@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Validate deterministic and repository-local implementation boundaries."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import sys
+
+from _validator_common import compute_repo_root, emit_yaml, make_result, normalize_path
+
+VALIDATOR = "validate-determinism"
+
+SCAN_ROOTS = [
+    "tools/horoji",
+    ".github/workflows",
+]
+
+ALLOWED_PATTERN_FILES = {
+    "tools/horoji/validators/validate-determinism",
+}
+
+FORBIDDEN_PATTERNS = [
+    ("implicit_environment_read", r"\bos\.environ\b"),
+    ("implicit_environment_read", r"\bos\.getenv\s*\("),
+    ("host_home_discovery", r"\bPath\.home\s*\("),
+    ("host_home_discovery", r"\bexpanduser\s*\("),
+    ("host_tempfile_dependency", r"\btempfile\b"),
+    ("network_dependency", r"\brequests\b"),
+    ("network_dependency", r"\burllib\b"),
+    ("network_dependency", r"\bhttp\.client\b"),
+    ("network_dependency", r"\bsocket\b"),
+    ("runtime_randomness", r"\brandom\b"),
+    ("runtime_randomness", r"\buuid\b"),
+    ("wall_clock_time", r"\bdatetime\.now\s*\("),
+    ("wall_clock_time", r"\bdatetime\.datetime\.now\s*\("),
+    ("wall_clock_time", r"\bdatetime\.utcnow\s*\("),
+    ("wall_clock_time", r"\bdatetime\.datetime\.utcnow\s*\("),
+    ("wall_clock_time", r"\btime\.time\s*\("),
+    ("implicit_cwd_authority", r"\bos\.getcwd\s*\("),
+    ("implicit_cwd_authority", r"\bPath\.cwd\s*\("),
+    ("nondeterministic_serialization", r"sort_keys\s*=\s*False"),
+]
+
+
+def iter_scanned_files(repo_root: str) -> list[str]:
+    files: list[str] = []
+    for rel_root in SCAN_ROOTS:
+        root = os.path.join(repo_root, rel_root)
+        if not os.path.isdir(root):
+            continue
+        for current_root, dirs, names in os.walk(root):
+            dirs[:] = sorted(d for d in dirs if d != "__pycache__")
+            for name in sorted(names):
+                path = os.path.join(current_root, name)
+                if os.path.isfile(path) and _is_scanned_file(path):
+                    files.append(path)
+    return sorted(files)
+
+
+def _is_scanned_file(path: str) -> bool:
+    name = os.path.basename(path)
+    return not name.startswith(".")
+
+
+def validate_file(repo_root: str, path: str) -> list[str]:
+    rel = normalize_path(path, repo_root)
+    if rel in ALLOWED_PATTERN_FILES:
+        return []
+
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError as exc:
+        return [f"{rel}:read_error:{exc}"]
+
+    findings: list[str] = []
+    for reason, pattern in FORBIDDEN_PATTERNS:
+        if re.search(pattern, text):
+            findings.append(f"{rel}:{reason}:{pattern}")
+    return findings
+
+
+def validate_repository(repo_root: str) -> list[str]:
+    findings: list[str] = []
+    for path in iter_scanned_files(repo_root):
+        findings.extend(validate_file(repo_root, path))
+    return sorted(findings)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Validate Horoji determinism and repository-locality boundaries."
+    )
+    parser.add_argument("--repo-root", help="Repository root override")
+    args = parser.parse_args()
+
+    repo_root = compute_repo_root(__file__, args.repo_root)
+    findings = validate_repository(repo_root)
+
+    if findings:
+        emit_yaml(
+            make_result(
+                VALIDATOR,
+                "FAIL",
+                "determinism_boundary",
+                "prohibited_runtime_source_detected",
+                findings,
+            )
+        )
+        sys.exit(1)
+
+    emit_yaml(
+        make_result(
+            VALIDATOR,
+            "PASS",
+            "determinism_boundary",
+            "no_prohibited_runtime_sources_detected",
+            [f"scanned_files={len(iter_scanned_files(repo_root))}"],
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()
