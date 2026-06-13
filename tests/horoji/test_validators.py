@@ -322,6 +322,41 @@ def test_validate_provenance_fails_on_missing_provenance(tmp_path):
     assert out["reason"] == "missing_provenance"
 
 
+def test_validate_provenance_fails_on_invalid_derived_artifact_shape(tmp_path):
+    repo = make_temp_repo(tmp_path)
+    artifact = os.path.join(repo, ".project_memory", "derived", "impact_sets", "README_md.yaml")
+    with open(artifact, "r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh)
+    data.pop("file", None)
+    with open(artifact, "w", encoding="utf-8") as fh:
+        yaml.safe_dump(data, fh, sort_keys=False)
+
+    result = run_validator("validate-provenance", repo_root=repo)
+
+    assert result.returncode != 0
+    out = parse_yaml_output(result.stdout)
+    assert out["status"] == "FAIL"
+    assert out["reason"] == "artifact_structure_validation_failed"
+    assert any("missing required field 'file'" in detail for detail in out["details"])
+
+
+def test_validate_provenance_fails_on_invalid_derived_trust_level(tmp_path):
+    repo = make_temp_repo(tmp_path)
+    artifact = os.path.join(repo, ".project_memory", "derived", "dependencies", "horoji_cli.yaml")
+    with open(artifact, "r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh)
+    data["provenance"]["trust_level"] = "authoritative"
+    with open(artifact, "w", encoding="utf-8") as fh:
+        yaml.safe_dump(data, fh, sort_keys=False)
+
+    result = run_validator("validate-provenance", repo_root=repo)
+
+    assert result.returncode != 0
+    out = parse_yaml_output(result.stdout)
+    assert out["status"] == "FAIL"
+    assert out["reason"] == "invalid_trust_level"
+
+
 def test_validate_scheduler_non_blocking_fails_on_forbidden_call(tmp_path):
     repo = make_temp_repo(tmp_path)
     scheduler_file = os.path.join(repo, "tools", "horoji", "validators", "scheduler_surface.py")

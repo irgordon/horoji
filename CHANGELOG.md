@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Schema Stability and Metadata Contracts
+
+- Added `docs/SCHEMAS.md` documenting governed metadata schema boundaries,
+  required and optional fields, versioning rules, compatibility rules, derived
+  artifact schema-change handling, and validator enforcement expectations for
+  the v0.2.0 roadmap phase.
+- Added validator regression coverage for malformed derived artifact structure
+  without changing public CLI behavior or claiming a final v1.0.0 schema
+  freeze.
+
 ### Added — Baseline Packaging and Installability
 
 - Documented the clean-clone setup path, supported Python runtime,

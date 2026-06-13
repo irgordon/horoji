@@ -268,6 +268,7 @@ Primary governance and implementation documents:
 - `docs/IMPLEMENTATION_PLAN.md`
 - `docs/AGENT_INTEGRATION.md`
 - `docs/ROADMAP.md`
+- `docs/SCHEMAS.md`
 - `docs/TASK_00_HOROJI_BOOTSTRAP.md`
 - `docs/TASK_01_AUTHORITATIVE_SURFACES.md`
 - `docs/TASK_02_GENERATORS.md`
