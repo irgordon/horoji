@@ -249,6 +249,11 @@ command. When committed derived policy reports stale artifacts, rerun
 Do not manually edit derived artifacts as a substitute for regeneration. Do not
 treat derived artifacts as authoritative.
 
+The release gate is defined in `docs/RELEASE.md`. It aligns the local validation
+commands, CI workflow, committed derived policy, changelog requirement, decision
+record requirement, and clean-tree requirement used before release-candidate
+work.
+
 ## Operator Command Matrix
 
 | Task | Command | Notes |
@@ -295,6 +300,7 @@ Primary governance and implementation documents:
 - `docs/IMPLEMENTATION_PLAN.md`
 - `docs/AGENT_INTEGRATION.md`
 - `docs/ROADMAP.md`
+- `docs/RELEASE.md`
 - `docs/SCHEMAS.md`
 - `docs/TASK_00_HOROJI_BOOTSTRAP.md`
 - `docs/TASK_01_AUTHORITATIVE_SURFACES.md`

@@ -8,6 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed — Release Gate and CI Finalization
+
+- Added `docs/RELEASE.md` defining the local and CI release gate, committed
+  derived policy requirement, changelog and decision-record requirements, and
+  clean-tree requirement before release-candidate work.
+- Updated Horoji CI to run on pull requests, pushes to `main`, and manual
+  dispatch, with an explicit `validate-all` step before committed derived
+  policy enforcement and full pytest.
+
 ### Changed — Production Usability
 
 - Improved public CLI and `horoji-check` help text with clearer purposes,

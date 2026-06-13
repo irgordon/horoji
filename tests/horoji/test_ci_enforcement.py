@@ -15,6 +15,7 @@ import yaml
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 WORKFLOW_FILE = os.path.join(REPO_ROOT, ".github", "workflows", "horoji-ci.yml")
+RELEASE_DOC = os.path.join(REPO_ROOT, "docs", "RELEASE.md")
 CLI_CHECK = os.path.join(REPO_ROOT, "tools", "horoji", "cli", "horoji-check")
 
 EXPECTED_STAGE_ORDER = [
@@ -82,6 +83,41 @@ def test_ci_workflow_file_exists_and_parses():
     assert isinstance(data, dict)
     assert "on" in data
     assert "pull_request" in data["on"]
+    assert "push" in data["on"]
+    assert "workflow_dispatch" in data["on"]
+
+
+def test_ci_workflow_matches_release_gate_commands():
+    text = Path(WORKFLOW_FILE).read_text(encoding="utf-8")
+
+    assert 'python -m pip install -e ".[test]"' in text
+    assert "python tools/horoji/validators/validate-all" in text
+    assert "python tools/horoji/cli/horoji-check" in text
+    assert "--derived-policy committed" in text
+    assert "python -m pytest tests/horoji/ -v" in text
+
+
+def test_release_gate_document_covers_required_boundaries():
+    text = Path(RELEASE_DOC).read_text(encoding="utf-8")
+
+    required_phrases = [
+        "python tools/horoji/validators/validate-all",
+        "python -m pytest",
+        "--derived-policy committed",
+        "git diff --check",
+        "git status --short --branch",
+        "CHANGELOG.md",
+        "docs/releases/",
+        "clean working tree",
+        "validate-cli-contract",
+        "validate-ownership",
+        "validate-determinism",
+        "validate-provenance",
+    ]
+    for phrase in required_phrases:
+        assert phrase in text
+    assert "```bash\nhoroji regenerate" not in text
+    assert "```bash\nhoroji invalidate" not in text
 
 
 def test_canonical_ci_entrypoint_exists_and_is_readable():

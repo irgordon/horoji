@@ -1,0 +1,9 @@
+file: docs/RELEASE.md
+impacted_subsystems: []
+provenance:
+  artifact_type: impact_set
+  generated_at: '2026-06-13T12:05:51-04:00'
+  generator: horoji-impact
+  input_commit: 04fc0300996b6f8376675397fe5d99b064eae6f1
+  schema_version: 1.0.0
+  trust_level: derived

@@ -2,6 +2,10 @@ name: horoji-ci
 
 "on":
   pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   horoji-enforcement:
@@ -22,6 +26,9 @@ jobs:
       - name: Install Horoji test dependencies
         run: python -m pip install -e ".[test]"
 
+      - name: Run Horoji validators
+        run: python tools/horoji/validators/validate-all
+
       - name: Resolve changed files
         id: changed
         run: |
@@ -30,8 +37,17 @@ jobs:
           import pathlib
           import subprocess
 
-          base = "${{ github.event.pull_request.base.sha }}"
-          head = "${{ github.event.pull_request.head.sha }}"
+          base = "${{ github.event.pull_request.base.sha || github.event.before }}".strip()
+          head = "${{ github.event.pull_request.head.sha || github.sha }}".strip() or "HEAD"
+          if not base:
+              base_result = subprocess.run(
+                  ["git", "rev-parse", "HEAD~1"],
+                  check=True,
+                  capture_output=True,
+                  text=True,
+              )
+              base = base_result.stdout.strip()
+
           result = subprocess.run(
               ["git", "diff", "--name-only", "--diff-filter=ACMR", base, head],
               check=True,
@@ -54,8 +70,6 @@ jobs:
           python tools/horoji/cli/horoji-check \
             --repo-root "$GITHUB_WORKSPACE" \
             --changed-files-file /tmp/horoji_changed_files.txt \
-            --base-sha "${{ github.event.pull_request.base.sha }}" \
-            --head-sha "${{ github.event.pull_request.head.sha }}" \
             --derived-policy committed
 
       - name: Run Horoji test suite
