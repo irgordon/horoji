@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — v1.0.0 Production Baseline
+
+- Added `docs/releases/v1.0.0-Decision.md` documenting acceptance of the
+  v1.0.0 production baseline.
+- Recorded final release scope, non-scope, release boundaries, evidence,
+  validation results, caveats, and follow-on work.
+- Kept the public CLI surface unchanged and did not add runtime behavior.
+
 ### Added — Developer and User Wiki
 
 - Added `docs/wiki/` with plain-language orientation pages for Horoji's
