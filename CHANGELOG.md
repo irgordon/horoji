@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Baseline Packaging and Installability
+
+- Documented the clean-clone setup path, supported Python runtime,
+  dependency installation command, validation commands, and public CLI example
+  for the v0.1.0 roadmap phase.
+- Declared PyYAML as a runtime project dependency and aligned CI dependency
+  installation with the repository metadata.
+- Added smoke coverage for documented CLI, `horoji-check`, and validator
+  entrypoints without expanding the public command surface.
+
 ### Changed — Validator and CI Readability
 
 - Split oversized validator and `horoji-check` orchestration flows into smaller

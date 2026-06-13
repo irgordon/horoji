@@ -83,6 +83,40 @@ tests/
 Root documentation orients contributors. Detailed governance lives in `docs/`.
 Machine-readable memory artifacts live in `.project_memory/`.
 
+## Clean-Clone Setup
+
+Supported runtime:
+
+- Python 3.12 or newer
+
+Horoji is a repository-local toolset. From a clean clone, use a local virtual
+environment and install the repository metadata with test dependencies:
+
+```bash
+git clone https://github.com/irgordon/horoji.git
+cd horoji
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e ".[test]"
+```
+
+Run the standard local validation path:
+
+```bash
+python tools/horoji/validators/validate-all
+python -m pytest
+python tools/horoji/cli/horoji-check \
+  --repo-root . \
+  --changed-file README.md \
+  --derived-policy committed
+```
+
+Run a public CLI query example:
+
+```bash
+python tools/horoji/cli/horoji --repo-root . get-contract horoji_cli
+```
+
 ## Authoritative vs Derived Artifacts
 
 Authoritative artifacts define canonical repository memory facts. They are

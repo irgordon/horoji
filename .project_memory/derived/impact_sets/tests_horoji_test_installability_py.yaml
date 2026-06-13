@@ -1,0 +1,9 @@
+file: tests/horoji/test_installability.py
+impacted_subsystems: []
+provenance:
+  artifact_type: impact_set
+  generated_at: '2026-06-13T02:10:46-04:00'
+  generator: horoji-impact
+  input_commit: 37bbeeed239c43870fd2e9fd3a1a7c96ad215311
+  schema_version: 1.0.0
+  trust_level: derived
