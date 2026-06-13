@@ -1,0 +1,9 @@
+file: docs/wiki/page-6-what-to-edit.md
+impacted_subsystems: []
+provenance:
+  artifact_type: impact_set
+  generated_at: '2026-06-13T12:26:22-04:00'
+  generator: horoji-impact
+  input_commit: 44de5672c44801be22f1882af9abf9cde3fafc25
+  schema_version: 1.0.0
+  trust_level: derived

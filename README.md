@@ -21,6 +21,8 @@ Before a developer or agent edits code, Horoji gives them a structured way to ch
 
 Horoji does not replace the repository’s source files or documentation. Those remain the source of truth. Horoji reads those facts, organizes them, and checks that generated project memory stays current.
 
+New to Horoji? Start with the [Horoji Wiki](docs/wiki/introduction.md) for a plain-language walkthrough of the major components, terms, workflows, and diagrams.
+
 ## Why Use Horoji?
 
 Large repositories are hard to understand quickly.

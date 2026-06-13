@@ -8,6 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Developer and User Wiki
+
+- Added `docs/wiki/` with plain-language orientation pages for Horoji's
+  problem, mental model, major components, key terms, command options,
+  workflows, first-hour setup, editing boundaries, troubleshooting, and
+  release/CI flow.
+- Added README and roadmap references for the v0.6.0-docs documentation phase
+  without changing runtime behavior or claiming final v1.0.0 release.
+
 ### Added — v0.5.0-rc.1 Release Candidate
 
 - Added the `docs/releases/v0.5.0-rc.1-Decision.md` release-candidate

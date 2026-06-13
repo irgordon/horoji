@@ -218,6 +218,40 @@ Non-goals:
 - no CLI changes unless release-blocking
 - no production v1.0.0 tag yet
 
+### v0.6.0-docs — Developer and User Wiki
+
+Goal:
+
+Make Horoji understandable to a new developer or user before final v1.0.0.
+
+Expected work:
+
+- create a plain-language wiki landing page
+- explain major Horoji components
+- define key terms and command options
+- add workflow diagrams
+- add a first-hour walkthrough
+- add troubleshooting guidance
+- link the README to the wiki
+
+Acceptance criteria:
+
+- wiki landing page exists
+- major components are explained
+- key terms and command options are defined
+- workflow diagrams are included
+- first-hour walkthrough exists
+- troubleshooting guide exists
+- README points to the wiki
+- no runtime behavior changes
+
+Non-goals:
+
+- no new product behavior
+- no public CLI expansion
+- no new validators unless required by existing checks
+- no final v1.0.0 tag yet
+
 ### v1.0.0 — Production Baseline
 
 Goal:
