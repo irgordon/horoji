@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed — Roadmap Compression
+
+- Compressed the remaining pre-v1.0.0 roadmap into a short release-candidate
+  track and moved non-blocking improvements to post-v1.0.0 work.
+- Defined the v1.0.0 production baseline in concrete operational terms without
+  adding runtime behavior or expanding the public CLI surface.
+
 ### Added — Schema Stability and Metadata Contracts
 
 - Added `docs/SCHEMAS.md` documenting governed metadata schema boundaries,

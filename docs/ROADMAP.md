@@ -30,6 +30,10 @@ release hardening.
 
 ## Production Release Definition
 
+Horoji v1.0.0 is production-ready when a clean clone can install, validate,
+query, and enforce repository memory boundaries reliably through documented
+commands and CI gates.
+
 Production-ready means:
 
 - clean installation path
@@ -119,24 +123,28 @@ Non-goals:
 - no remote schema registry
 - no runtime schema fetching
 
-### v0.3.0 — CLI Ergonomics and Query Reliability
+### v0.3.0 — Production Usability Pass
 
 Goal:
 
-Improve usability of the existing small public CLI.
+Make the existing production-facing workflow clear and repairable without
+expanding the public command surface.
 
 Expected work:
 
 - audit CLI help text
-- improve repairable error messages
+- improve error messages where they are not repairable
 - document common query examples
-- test CLI output stability
+- verify README setup and validation commands
+- run clean-clone validation
 - keep CLI contract, docs, and parser aligned
 
 Acceptance criteria:
 
-- help output is clear
+- CLI help output is clear
 - unsupported commands fail clearly
+- README commands match repository behavior
+- clean clone can install, validate, and query
 - query output is deterministic
 - `validate-cli-contract` passes
 
@@ -144,178 +152,71 @@ Non-goals:
 
 - do not add `horoji regenerate`
 - do not add `horoji invalidate`
+- no public CLI expansion unless required to fix a release blocker
 - no interactive shell
 - no natural-language query system
 
-### v0.4.0 — CI and Release Gate Hardening
+### v0.4.0 — Release Gate and CI Finalization
 
 Goal:
 
-Make CI the reliable release gate.
+Finalize the release gate so local and CI validation enforce the same
+repository memory boundaries.
 
 Expected work:
 
-- confirm CI runs validators
-- confirm CI runs tests
-- confirm CI checks committed derived artifacts
+- confirm CI matches local validation
+- confirm packaging install works in CI
+- confirm committed derived policy is enforced
 - align local and CI validation
-- document required release gates
-- pin toolchain behavior where needed
+- confirm release checklist exists
 
 Acceptance criteria:
 
-- CI fails on governance drift
+- CI runs the documented install path
+- CI runs validators and tests
 - CI fails on stale derived artifacts
-- CI fails on CLI contract drift
-- CI fails on ownership gaps
-- CI fails on determinism violations
+- CI fails on governance drift
+- release checklist is documented
+- local and CI gates have no known drift
 
 Non-goals:
 
 - no deployment pipeline
-- no cloud-only validation path
 - no external service dependency
+- no cloud-only validation path
+- no new public CLI commands
 
-### v0.5.0 — Documentation Completeness
-
-Goal:
-
-Bring operator, contributor, and release docs to release-candidate quality.
-
-Expected work:
-
-- expand contributor workflow
-- add release process documentation
-- add troubleshooting notes
-- add examples for authoritative and derived artifacts
-- add examples for agent workflow
-
-Acceptance criteria:
-
-- docs support first-time use
-- docs explain authority boundaries
-- docs explain release process
-- docs avoid unsupported claims
-
-Non-goals:
-
-- no marketing rewrite
-- no README replacement for governance docs
-- no speculative feature promises
-
-### v0.6.0 — Regeneration and Invalidation Confidence
+### v0.5.0-rc.1 — Release Candidate
 
 Goal:
 
-Strengthen confidence that derived artifacts are reproducible and invalidation
-is correct.
-
-Expected work:
-
-- test incremental invalidation
-- test full regeneration equivalence
-- confirm stable ordering
-- confirm provenance completeness
-- document stale-derived recovery steps
-
-Acceptance criteria:
-
-- incremental invalidation tests pass
-- regeneration equivalence tests pass
-- derived artifacts are stable across repeated runs
-- committed derived policy passes
-
-Non-goals:
-
-- no hidden regeneration behavior
-- no caching layer unless governed and deterministic
-- no performance work unless correctness requires it
-
-### v0.7.0 — Security and Boundary Review
-
-Goal:
-
-Review repository-locality and safety boundaries before release-candidate work.
-
-Expected work:
-
-- audit path handling
-- audit subprocess usage
-- audit parser behavior
-- audit generated write paths
-- audit network prohibition
-- audit environment input handling
-
-Acceptance criteria:
-
-- no host filesystem escape
-- no network access
-- no implicit environment dependency
-- no unsafe path traversal
-- boundary failures are explicit
-
-Non-goals:
-
-- no sandbox runtime
-- no secrets system
-- no remote execution
-- no authorization framework
-
-### v0.8.0 — Release Candidate Preparation
-
-Goal:
-
-Freeze the surfaces required for v1.0.0.
+Tag and validate a v1.0.0 release candidate from a frozen public surface.
 
 Expected work:
 
 - freeze public CLI surface
-- freeze metadata schemas
-- freeze validation gate expectations
-- resolve open caveats
-- create release-candidate decision document
-
-Acceptance criteria:
-
-- public CLI freeze documented
-- schema freeze documented
-- release gates documented
-- no unresolved P0/P1 findings
-- full validation passes
-
-Non-goals:
-
-- no feature work after freeze
-- no architecture expansion
-- no unplanned validator additions unless release-blocking
-
-### v0.9.0 — Release Candidate
-
-Goal:
-
-Tag and validate a v1.0.0 release candidate.
-
-Expected work:
-
-- create RC tag
+- freeze schema surfaces
 - run clean-clone validation
-- review README and release docs
-- confirm changelog
-- record RC decision
+- create RC decision record
+- tag release candidate
 
 Acceptance criteria:
 
+- public CLI freeze is documented
+- schema freeze is documented
+- RC decision record exists
 - RC tag exists
 - clean-clone validation passes
 - full tests pass
-- release decision exists
-- no governance drift
+- no known release-blocking governance drift
 
 Non-goals:
 
 - no feature work
 - no schema changes unless release-blocking
 - no CLI changes unless release-blocking
+- no production v1.0.0 tag yet
 
 ### v1.0.0 — Production Baseline
 
@@ -353,6 +254,20 @@ Non-goals:
 - no source-of-truth replacement claim
 - no probabilistic retrieval claim
 - no public regenerate/invalidate commands unless accepted before freeze
+
+## Post-v1.0.0 Work
+
+These items are useful but not release blockers for v1.0.0:
+
+- deeper query ergonomics
+- expanded examples
+- additional schema evolution work
+- performance improvements
+- broader invalidation confidence tests
+- advanced documentation validation
+- richer release automation
+- optional troubleshooting expansion
+- future security or boundary hardening that does not block the baseline
 
 ## Release Guardrails
 
