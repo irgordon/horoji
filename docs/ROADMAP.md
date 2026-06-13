@@ -1,392 +1,381 @@
-# Horoji v1.0.0 Production Roadmap
+# Horoji v1.0.0 Roadmap
 
-## Roadmap Goal
+## Purpose
 
-Move Horoji from a coherent governed baseline to a production-ready repository memory subsystem.
+This roadmap describes the path from the accepted BASELINE-0.0.1 state to a
+stable v1.0.0 production release.
+
+It is a planning document. It does not claim that Horoji is already
+production-ready, and it does not authorize runtime behavior, public CLI
+expansion, schema changes, or weaker governance boundaries.
+
+## Current Baseline
+
+The accepted BASELINE-0.0.1 state establishes a coherent governed baseline:
+
+- a governed baseline decision record exists
+- the public CLI boundary is small and validated
+- regeneration and invalidation are internal orchestration surfaces
+- active tool ownership is enforced
+- determinism and repository-locality boundaries are enforced
+- derived artifact provenance is validated
+- committed derived artifact policy passes
+- README documents the current operator surface
+- validation gates and regression tests pass for the baseline
+- the committed-derived impact loop has been fixed
+- validator exception and function-shape issues have been fixed
+
+The baseline is not a production-readiness claim. It is the starting point for
+release hardening.
+
+## Production Release Definition
 
 Production-ready means:
 
-- documented installation and local operation
+- clean installation path
 - stable public CLI contract
-- stable authoritative metadata schema
-- reliable validation in CI
-- deterministic derived artifact behavior
-- clear release/versioning rules
-- clean operator guidance
-- regression coverage for governance boundaries
-- no undocumented runtime assumptions
+- stable metadata schemas
+- documented validation gates
+- reproducible derived artifacts
+- CI-enforced governance
+- clear operator and contributor workflows
+- release decision record
+- clean tag from a validated tree
 
 Production-ready does not mean:
 
 - autonomous reasoning
 - probabilistic retrieval
-- remote services
-- plugin marketplaces
-- external integrations
-- replacing repository source files
-- replacing governance documents
-- broad AI-agent orchestration
+- external services
+- plugin marketplace
+- network dependency
+- source-of-truth replacement
+- public regeneration or invalidation commands unless explicitly accepted
+  before freeze
 
 Canonical truth remains in repository source files and governance documents.
+Horoji remains a deterministic, repository-resident projection and validation
+system.
 
-Horoji remains a deterministic, repository-resident projection and validation system.
+## Version Plan
 
----
+### v0.1.0 — Baseline Packaging and Installability
 
-## v0.1.0 - Baseline Packaging and Installability
+Goal:
 
-### Goal
+Make Horoji installable and runnable from a clean clone.
 
-Make Horoji easy to install, run, and validate in a clean clone.
+Expected work:
 
-### Scope
+- document Python version
+- document dependency setup
+- document local validation commands
+- confirm clean-clone validation path
+- add packaging metadata if appropriate
+- add CLI smoke tests if missing
 
-- Add documented local setup instructions.
-- Add dependency installation guidance.
-- Add a standard developer command path.
-- Confirm clean-clone validation works.
-- Document supported Python version.
-- Document expected repository layout.
-- Document how generated artifacts are handled.
-- Add packaging metadata if appropriate.
-- Add smoke tests for CLI entrypoints.
+Acceptance criteria:
 
-### Acceptance Criteria
+- clean clone can run documented validation
+- README setup commands work
+- public CLI entrypoints work
+- `validate-all` passes
+- `pytest` passes
+- committed derived policy passes
 
-- A new contributor can clone the repo and run validation from README instructions.
-- Public CLI commands work from documented paths.
-- `validate-all` passes in a clean setup.
-- `pytest` passes in a clean setup.
-- `horoji-check --derived-policy committed` passes.
-- README setup instructions match actual commands.
-- No new public CLI commands are added unless the CLI contract is updated and validated.
+Non-goals:
 
-### Non-Goals
+- no daemon
+- no network service
+- no plugin system
+- no public `horoji regenerate` command
+- no public `horoji invalidate` command
 
-- No daemon.
-- No network service.
-- No plugin system.
-- No external persistence layer.
-- No speculative packaging for platforms not tested.
+### v0.2.0 — Schema Stability and Metadata Contracts
 
----
+Goal:
 
-## v0.2.0 - Schema Stability and Metadata Contracts
+Stabilize metadata schemas before v1.0.0.
 
-### Goal
+Expected work:
 
-Define the metadata surfaces that must remain stable through v1.0.0.
+- review authoritative contracts
+- review invariant schemas
+- review ownership metadata
+- review derived artifact schemas
+- add schema versioning where needed
+- document compatibility rules
 
-### Scope
+Acceptance criteria:
 
-- Review authoritative contracts.
-- Review invariant schemas.
-- Review ownership metadata schemas.
-- Review derived artifact schemas.
-- Add schema version fields where needed.
-- Define compatibility expectations.
-- Add schema validation tests.
-- Document allowed schema evolution rules.
+- every governed metadata type has a documented schema
+- validators reject malformed metadata
+- breaking changes are defined
+- non-breaking changes are defined
 
-### Acceptance Criteria
+Non-goals:
 
-- Every authoritative metadata type has a documented schema.
-- Every derived metadata type has a documented schema.
-- Validators reject malformed metadata.
-- Schema versions are explicit where needed.
-- Breaking changes are defined.
-- Non-breaking changes are defined.
-- CHANGELOG records schema-surface changes clearly.
+- no broad schema redesign without evidence
+- no remote schema registry
+- no runtime schema fetching
 
-### Non-Goals
+### v0.3.0 — CLI Ergonomics and Query Reliability
 
-- No broad schema redesign without evidence.
-- No migration framework unless required.
-- No remote schema registry.
-- No runtime schema fetching.
+Goal:
 
----
+Improve usability of the existing small public CLI.
 
-## v0.3.0 - CLI Ergonomics and Query Reliability
+Expected work:
 
-### Goal
+- audit CLI help text
+- improve repairable error messages
+- document common query examples
+- test CLI output stability
+- keep CLI contract, docs, and parser aligned
 
-Make the small public CLI easier to use without expanding it unnecessarily.
+Acceptance criteria:
 
-### Scope
+- help output is clear
+- unsupported commands fail clearly
+- query output is deterministic
+- `validate-cli-contract` passes
 
-- Audit current public CLI commands.
-- Improve help text.
-- Improve error messages.
-- Add examples for common queries.
-- Add stable output modes if needed.
-- Add tests for CLI output stability.
-- Confirm CLI contract, docs, and parser remain aligned.
+Non-goals:
 
-### Acceptance Criteria
+- do not add `horoji regenerate`
+- do not add `horoji invalidate`
+- no interactive shell
+- no natural-language query system
 
-- `horoji --help` is clear.
-- Public commands are documented.
-- Unsupported commands fail clearly.
-- CLI output is deterministic.
-- CLI errors are repairable.
-- `validate-cli-contract` passes.
-- CLI tests cover command help and common query paths.
+### v0.4.0 — CI and Release Gate Hardening
 
-### Non-Goals
+Goal:
 
-- Do not add `horoji regenerate` as a public command.
-- Do not add `horoji invalidate` as a public command.
-- Do not add an interactive shell.
-- Do not add natural-language query behavior.
-- Do not add probabilistic retrieval.
+Make CI the reliable release gate.
 
----
+Expected work:
 
-## v0.4.0 - CI and Release Gate Hardening
+- confirm CI runs validators
+- confirm CI runs tests
+- confirm CI checks committed derived artifacts
+- align local and CI validation
+- document required release gates
+- pin toolchain behavior where needed
 
-### Goal
+Acceptance criteria:
 
-Make CI the reliable production gate for Horoji.
+- CI fails on governance drift
+- CI fails on stale derived artifacts
+- CI fails on CLI contract drift
+- CI fails on ownership gaps
+- CI fails on determinism violations
 
-### Scope
+Non-goals:
 
-- Ensure CI runs validators.
-- Ensure CI runs tests.
-- Ensure CI checks committed derived artifacts.
-- Ensure CI checks formatting or linting if already governed.
-- Add a release-readiness workflow if appropriate.
-- Document required gates before tagging.
-- Ensure CI uses pinned tooling.
+- no deployment pipeline
+- no cloud-only validation path
+- no external service dependency
 
-### Acceptance Criteria
+### v0.5.0 — Documentation Completeness
 
-- Pull requests fail on governance drift.
-- Pull requests fail on stale derived artifacts.
-- Pull requests fail on CLI contract drift.
-- Pull requests fail on ownership gaps.
-- Pull requests fail on determinism boundary violations.
-- CI instructions are documented.
-- Local validation and CI validation are aligned.
+Goal:
 
-### Non-Goals
+Bring operator, contributor, and release docs to release-candidate quality.
 
-- No deployment pipeline.
-- No external service dependency.
-- No cloud-only workflow.
-- No CI behavior that cannot be reproduced locally.
+Expected work:
 
----
+- expand contributor workflow
+- add release process documentation
+- add troubleshooting notes
+- add examples for authoritative and derived artifacts
+- add examples for agent workflow
 
-## v0.5.0 - Documentation Completeness
+Acceptance criteria:
 
-### Goal
+- docs support first-time use
+- docs explain authority boundaries
+- docs explain release process
+- docs avoid unsupported claims
 
-Bring operator, contributor, and governance documentation to release-candidate quality.
+Non-goals:
 
-### Scope
+- no marketing rewrite
+- no README replacement for governance docs
+- no speculative feature promises
 
-- Expand README where needed.
-- Add contributor workflow documentation.
-- Add release process documentation.
-- Add troubleshooting notes.
-- Add examples for authoritative and derived artifacts.
-- Add examples for agent workflow.
-- Ensure docs do not duplicate or contradict governance files.
-- Add documentation drift checks only if needed.
+### v0.6.0 — Regeneration and Invalidation Confidence
 
-### Acceptance Criteria
+Goal:
 
-- README supports first-time use.
-- Governance docs explain authority boundaries.
-- Release process is documented.
-- Agent workflow is documented.
-- Operator commands are documented.
-- Documentation avoids unsupported claims.
-- Documentation does not present internal orchestration as public CLI.
+Strengthen confidence that derived artifacts are reproducible and invalidation
+is correct.
 
-### Non-Goals
+Expected work:
 
-- No marketing-heavy rewrite.
-- No replacing governance docs with README prose.
-- No broad speculative roadmap claims.
-- No production-readiness claim before release gates support it.
+- test incremental invalidation
+- test full regeneration equivalence
+- confirm stable ordering
+- confirm provenance completeness
+- document stale-derived recovery steps
 
----
+Acceptance criteria:
 
-## v0.6.0 - Deterministic Regeneration and Invalidation Confidence
+- incremental invalidation tests pass
+- regeneration equivalence tests pass
+- derived artifacts are stable across repeated runs
+- committed derived policy passes
 
-### Goal
+Non-goals:
 
-Strengthen confidence that derived artifacts are reproducible and invalidation is correct.
+- no hidden regeneration behavior
+- no caching layer unless governed and deterministic
+- no performance work unless correctness requires it
 
-### Scope
+### v0.7.0 — Security and Boundary Review
 
-- Add regression tests for incremental invalidation.
-- Add regression tests for full regeneration equivalence.
-- Confirm stable ordering in derived artifacts.
-- Confirm provenance is complete.
-- Confirm changed files map to expected impact artifacts.
-- Document recovery steps for stale derived artifacts.
+Goal:
 
-### Acceptance Criteria
+Review repository-locality and safety boundaries before release-candidate work.
 
-- Incremental invalidation tests pass.
-- Full regeneration equivalence tests pass.
-- Derived artifacts are stable across repeated runs.
-- Provenance validator passes.
-- Committed derived policy passes.
-- Stale derived artifact failure is clear and repairable.
+Expected work:
 
-### Non-Goals
+- audit path handling
+- audit subprocess usage
+- audit parser behavior
+- audit generated write paths
+- audit network prohibition
+- audit environment input handling
 
-- No performance optimization unless correctness requires it.
-- No caching layer unless governed and deterministic.
-- No hidden regeneration behavior.
+Acceptance criteria:
 
----
+- no host filesystem escape
+- no network access
+- no implicit environment dependency
+- no unsafe path traversal
+- boundary failures are explicit
 
-## v0.7.0 - Security and Boundary Review
+Non-goals:
 
-### Goal
+- no sandbox runtime
+- no secrets system
+- no remote execution
+- no authorization framework
 
-Review Horoji's safety boundaries before release-candidate work.
+### v0.8.0 — Release Candidate Preparation
 
-### Scope
+Goal:
 
-- Audit repository locality enforcement.
-- Audit network prohibition.
-- Audit environment input handling.
-- Audit file path handling.
-- Audit subprocess usage.
-- Audit YAML/JSON parsing behavior.
-- Audit generated artifact write paths.
-- Add regression tests for boundary violations.
+Freeze the surfaces required for v1.0.0.
 
-### Acceptance Criteria
+Expected work:
 
-- No host filesystem escape.
-- No network access.
-- No implicit environment dependency.
-- No unsafe path traversal.
-- No broad exception swallowing in critical validators.
-- Boundary failures are explicit.
-- Security review findings are documented.
+- freeze public CLI surface
+- freeze metadata schemas
+- freeze validation gate expectations
+- resolve open caveats
+- create release-candidate decision document
 
-### Non-Goals
+Acceptance criteria:
 
-- No sandbox runtime.
-- No remote execution.
-- No secrets handling system.
-- No agent authorization system.
+- public CLI freeze documented
+- schema freeze documented
+- release gates documented
+- no unresolved P0/P1 findings
+- full validation passes
 
----
+Non-goals:
 
-## v0.8.0 - Release Candidate Preparation
+- no feature work after freeze
+- no architecture expansion
+- no unplanned validator additions unless release-blocking
 
-### Goal
+### v0.9.0 — Release Candidate
 
-Prepare Horoji for v1.0.0 release-candidate validation.
+Goal:
 
-### Scope
+Tag and validate a v1.0.0 release candidate.
 
-- Freeze public CLI surface for v1.0.0.
-- Freeze metadata schema surfaces for v1.0.0.
-- Freeze validation gate expectations.
-- Review all open TODOs and caveats.
-- Update changelog.
-- Create release-candidate decision document.
-- Confirm clean clone validation.
+Expected work:
 
-### Acceptance Criteria
+- create RC tag
+- run clean-clone validation
+- review README and release docs
+- confirm changelog
+- record RC decision
 
-- Public CLI freeze documented.
-- Metadata schema freeze documented.
-- Release gate documented.
-- No unresolved P0/P1 issues.
-- Full validation passes.
-- Full tests pass.
-- Committed derived policy passes.
-- Working tree clean.
-- RC decision document exists.
+Acceptance criteria:
 
-### Non-Goals
+- RC tag exists
+- clean-clone validation passes
+- full tests pass
+- release decision exists
+- no governance drift
 
-- No new features after freeze.
-- No architecture expansion.
-- No unplanned validator additions unless fixing release-blocking defects.
+Non-goals:
 
----
+- no feature work
+- no schema changes unless release-blocking
+- no CLI changes unless release-blocking
 
-## v0.9.0 - Release Candidate
+### v1.0.0 — Production Baseline
 
-### Goal
+Goal:
 
-Cut a release candidate and validate it as if it were v1.0.0.
+Publish Horoji v1.0.0 as a stable, governed, repository-resident project memory
+subsystem.
 
-### Scope
+Expected work:
 
-- Tag release candidate.
-- Run full validation from clean clone.
-- Review README and release docs.
-- Review changelog.
-- Confirm version identifiers.
-- Confirm no drift between docs, contracts, code, and derived artifacts.
-- Record RC decision.
+- final release-readiness audit
+- final changelog update
+- final release decision document
+- final tag
+- clean-clone validation
+- public CLI stability check
+- schema stability check
+- governance coherence check
 
-### Acceptance Criteria
+Acceptance criteria:
 
-- RC tag exists.
-- Clean clone validation passes.
-- Full tests pass.
-- Release decision document exists.
-- No governance drift.
-- No unsupported production claims.
-- No dirty working tree.
+- v1.0.0 tag exists
+- final release decision exists
+- full validation passes
+- full tests pass
+- clean-clone validation passes
+- public CLI contract is stable
+- metadata schemas are stable
+- README accurately describes production baseline use
+- no known release-blocking governance drift
 
-### Non-Goals
+Non-goals:
 
-- No feature work.
-- No schema changes unless release-blocking.
-- No CLI changes unless release-blocking.
-- No documentation rewrite unless correcting drift.
+- no AI reasoning-system claim
+- no source-of-truth replacement claim
+- no probabilistic retrieval claim
+- no public regenerate/invalidate commands unless accepted before freeze
 
----
+## Release Guardrails
 
-## v1.0.0 - Production Baseline
+- no public CLI expansion without contract, docs, parser, and validator alignment
+- no derived artifact manual edits outside approved orchestration
+- no weakening determinism or repository-locality enforcement
+- no active tool surface without ownership metadata
+- no undocumented runtime behavior
+- no release tag without full validation
 
-### Goal
+## Negative Patterns
 
-Publish Horoji v1.0.0 as a stable, governed, repository-resident project memory subsystem.
+- treating roadmap items as already implemented
+- using marketing language as release evidence
+- claiming production readiness early
+- documenting commands that do not exist
+- treating derived artifacts as authoritative
+- expanding scope during release stabilization
+- adding abstractions for hypothetical future features
+- weakening validators to pass a release gate
+- hiding caveats
 
-### Scope
+## Follow-On Work
 
-- Final release-readiness audit.
-- Final changelog update.
-- Final release decision document.
-- Final tag.
-- Confirm clean clone validation.
-- Confirm public CLI stability.
-- Confirm schema stability.
-- Confirm governance coherence.
-- Confirm deterministic artifact behavior.
-
-### Acceptance Criteria
-
-- v1.0.0 tag exists.
-- Release decision document exists.
-- Full validation passes.
-- Full tests pass.
-- Clean clone validation passes.
-- Public CLI contract is stable.
-- Metadata schema boundaries are stable.
-- README accurately describes production baseline use.
-- No known release-blocking governance drift.
-- No unsupported runtime or maturity claims.
-
-### Non-Goals
-
-- No claim that Horoji is an AI reasoning system.
-- No claim that Horoji replaces repository governance.
-- No claim that Horoji performs probabilistic retrieval.
-- No public regeneration/invalidation CLI unless explicitly accepted before freeze.
+Each roadmap version should have its own task prompt, validation evidence,
+changelog entry, and release or decision record as appropriate.

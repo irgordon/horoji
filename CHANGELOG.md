@@ -31,7 +31,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added — Production Roadmap
 
-- Added `docs/ROADMAP.md` documenting the v1.0.0 production roadmap.
+- Added `docs/ROADMAP.md` documenting the path from BASELINE-0.0.1 to a
+  v1.0.0 production release.
 
 ### Added — Release Decision Record
 
