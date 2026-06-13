@@ -1,8 +1,43 @@
 edges:
+- from: _validate_array_item
+  to: _is_type
+- from: _validate_array_item
+  to: validate_against_schema
+- from: _validate_array_items
+  to: _validate_array_item
+- from: _validate_declared_properties
+  to: _validate_property_value
+- from: _validate_object_value
+  to: validate_against_schema
+- from: _validate_property_value
+  to: _is_type
+- from: _validate_property_value
+  to: _validate_array_items
+- from: _validate_property_value
+  to: _validate_enum_value
+- from: _validate_property_value
+  to: _validate_object_value
+- from: _validate_property_value
+  to: _validate_string_length
 - from: validate_against_schema
   to: _is_type
+- from: validate_against_schema
+  to: _validate_declared_properties
+- from: validate_against_schema
+  to: _validate_required_fields
+- from: validate_against_schema
+  to: _validate_unknown_fields
 nodes:
 - _is_type
+- _validate_array_item
+- _validate_array_items
+- _validate_declared_properties
+- _validate_enum_value
+- _validate_object_value
+- _validate_property_value
+- _validate_required_fields
+- _validate_string_length
+- _validate_unknown_fields
 - compute_repo_root
 - emit_yaml
 - is_valid_identifier
@@ -16,9 +51,9 @@ nodes:
 - yaml_files_recursive
 provenance:
   artifact_type: callgraph
-  generated_at: '2026-04-02T01:46:29Z'
+  generated_at: '2026-06-12T02:00:44-04:00'
   generator: horoji-callgraph
-  input_commit: 3f5e64685b045a54dcc31d00ca47e55d4d2ab4fa
+  input_commit: f331dce5278aee061a6b897d1d7a20127b1c2a6f
   schema_version: 1.0.0
   trust_level: derived
 subsystem: horoji_validators

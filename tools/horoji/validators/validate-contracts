@@ -35,108 +35,10 @@ def main() -> None:
     contracts_dir = os.path.join(mem_root, "authoritative", "contracts")
     schema_file = os.path.join(mem_root, "schemas", "contract.schema.json")
 
-    try:
-        schema = load_json(schema_file)
-    except EXPECTED_JSON_LOAD_ERRORS as exc:
-        emit_yaml(
-            make_result(
-                VALIDATOR,
-                "ERROR",
-                normalize_path(schema_file, repo_root),
-                "configuration_error",
-                [str(exc)],
-            )
-        )
-        sys.exit(1)
-
-    contract_files = yaml_files_in(contracts_dir)
-    if not contract_files:
-        emit_yaml(
-            make_result(
-                VALIDATOR,
-                "FAIL",
-                normalize_path(contracts_dir, repo_root),
-                "no_contract_files",
-            )
-        )
-        sys.exit(1)
-
+    schema = load_contract_schema(schema_file, repo_root)
+    contract_files = discover_contract_files(contracts_dir, repo_root)
     for path in contract_files:
-        target = normalize_path(path, repo_root)
-        try:
-            data = load_yaml(path)
-        except EXPECTED_YAML_LOAD_ERRORS as exc:
-            emit_yaml(
-                make_result(VALIDATOR, "ERROR", target, "parse_error", [str(exc)])
-            )
-            sys.exit(1)
-
-        if not isinstance(data, dict):
-            emit_yaml(make_result(VALIDATOR, "FAIL", target, "contract_not_mapping"))
-            sys.exit(1)
-
-        schema_errors = validate_against_schema(data, schema)
-        if schema_errors:
-            emit_yaml(
-                make_result(VALIDATOR, "FAIL", target, "schema_validation_failed", schema_errors)
-            )
-            sys.exit(1)
-
-        subsystem = data.get("subsystem", "")
-        if not isinstance(subsystem, str) or subsystem.strip() == "":
-            emit_yaml(make_result(VALIDATOR, "FAIL", target, "empty_subsystem_identifier"))
-            sys.exit(1)
-        if not is_valid_identifier(subsystem):
-            emit_yaml(make_result(VALIDATOR, "FAIL", target, "invalid_subsystem_identifier"))
-            sys.exit(1)
-
-        owner = data.get("owner", "")
-        if not isinstance(owner, str) or owner.strip() == "":
-            emit_yaml(make_result(VALIDATOR, "FAIL", target, "empty_owner"))
-            sys.exit(1)
-
-        exports = data.get("exports", [])
-        if len(exports) != len(set(exports)):
-            emit_yaml(make_result(VALIDATOR, "FAIL", target, "duplicate_exports"))
-            sys.exit(1)
-
-        allowed = data.get("allowed_dependencies", [])
-        forbidden = data.get("forbidden_dependencies", [])
-        if len(allowed) != len(set(allowed)):
-            emit_yaml(make_result(VALIDATOR, "FAIL", target, "duplicate_allowed_dependencies"))
-            sys.exit(1)
-        if len(forbidden) != len(set(forbidden)):
-            emit_yaml(make_result(VALIDATOR, "FAIL", target, "duplicate_forbidden_dependencies"))
-            sys.exit(1)
-
-        overlap = sorted(set(allowed).intersection(set(forbidden)))
-        if overlap:
-            emit_yaml(
-                make_result(
-                    VALIDATOR,
-                    "FAIL",
-                    target,
-                    "dependency_sets_not_disjoint",
-                    overlap,
-                )
-            )
-            sys.exit(1)
-
-        for dep in sorted(set(allowed + forbidden)):
-            if not isinstance(dep, str) or dep.strip() == "":
-                emit_yaml(make_result(VALIDATOR, "FAIL", target, "empty_dependency_name"))
-                sys.exit(1)
-            if not is_valid_identifier(dep):
-                emit_yaml(
-                    make_result(
-                        VALIDATOR,
-                        "FAIL",
-                        target,
-                        "invalid_dependency_identifier",
-                        [dep],
-                    )
-                )
-                sys.exit(1)
+        validate_contract_file(path, schema, repo_root)
 
     emit_yaml(
         make_result(
@@ -147,6 +49,104 @@ def main() -> None:
             [f"count={len(contract_files)}"],
         )
     )
+
+
+def load_contract_schema(schema_file: str, repo_root: str) -> dict:
+    try:
+        return load_json(schema_file)
+    except EXPECTED_JSON_LOAD_ERRORS as exc:
+        fail_validation(repo_root, schema_file, "ERROR", "configuration_error", [str(exc)])
+
+
+def discover_contract_files(contracts_dir: str, repo_root: str) -> list[str]:
+    contract_files = yaml_files_in(contracts_dir)
+    if not contract_files:
+        fail_validation(repo_root, contracts_dir, "FAIL", "no_contract_files")
+    return contract_files
+
+
+def validate_contract_file(path: str, schema: dict, repo_root: str) -> None:
+    target = normalize_path(path, repo_root)
+    data = load_contract_document(path, target)
+    validate_contract_schema(data, schema, target)
+    validate_contract_identity(data, target)
+    validate_contract_dependencies(data, target)
+
+
+def load_contract_document(path: str, target: str) -> dict:
+    try:
+        data = load_yaml(path)
+    except EXPECTED_YAML_LOAD_ERRORS as exc:
+        fail_target(target, "ERROR", "parse_error", [str(exc)])
+
+    if not isinstance(data, dict):
+        fail_target(target, "FAIL", "contract_not_mapping")
+    return data
+
+
+def validate_contract_schema(data: dict, schema: dict, target: str) -> None:
+    schema_errors = validate_against_schema(data, schema)
+    if schema_errors:
+        fail_target(target, "FAIL", "schema_validation_failed", schema_errors)
+
+
+def validate_contract_identity(data: dict, target: str) -> None:
+    subsystem = data.get("subsystem", "")
+    if not isinstance(subsystem, str) or subsystem.strip() == "":
+        fail_target(target, "FAIL", "empty_subsystem_identifier")
+    if not is_valid_identifier(subsystem):
+        fail_target(target, "FAIL", "invalid_subsystem_identifier")
+
+    owner = data.get("owner", "")
+    if not isinstance(owner, str) or owner.strip() == "":
+        fail_target(target, "FAIL", "empty_owner")
+
+    exports = data.get("exports", [])
+    if len(exports) != len(set(exports)):
+        fail_target(target, "FAIL", "duplicate_exports")
+
+
+def validate_contract_dependencies(data: dict, target: str) -> None:
+    allowed = data.get("allowed_dependencies", [])
+    forbidden = data.get("forbidden_dependencies", [])
+    if len(allowed) != len(set(allowed)):
+        fail_target(target, "FAIL", "duplicate_allowed_dependencies")
+    if len(forbidden) != len(set(forbidden)):
+        fail_target(target, "FAIL", "duplicate_forbidden_dependencies")
+
+    overlap = sorted(set(allowed).intersection(set(forbidden)))
+    if overlap:
+        fail_target(target, "FAIL", "dependency_sets_not_disjoint", overlap)
+
+    for dep in sorted(set(allowed + forbidden)):
+        validate_dependency_name(dep, target)
+
+
+def validate_dependency_name(dep: object, target: str) -> None:
+    if not isinstance(dep, str) or dep.strip() == "":
+        fail_target(target, "FAIL", "empty_dependency_name")
+    if not is_valid_identifier(dep):
+        fail_target(target, "FAIL", "invalid_dependency_identifier", [dep])
+
+
+def fail_validation(
+    repo_root: str,
+    path: str,
+    status: str,
+    reason: str,
+    details: list[object] | None = None,
+) -> None:
+    fail_target(normalize_path(path, repo_root), status, reason, details)
+
+
+def fail_target(
+    target: str,
+    status: str,
+    reason: str,
+    details: list[object] | None = None,
+) -> None:
+    emit_yaml(make_result(VALIDATOR, status, target, reason, details))
+    sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -118,38 +118,57 @@ def _resolve_deterministic_input_commit(repo_root: str) -> str:
 def _check_bootstrap_presence(repo_root: str) -> list[str]:
     missing = []
     for rel_path in REQUIRED_DIRECTORIES + REQUIRED_SCHEMA_FILES + REQUIRED_CONFIG_FILES:
-        path = os.path.join(repo_root, rel_path)
-        if rel_path in REQUIRED_DIRECTORIES:
-            if not os.path.isdir(path):
-                missing.append(rel_path)
-        elif not os.path.isfile(path):
+        if _bootstrap_anchor_missing(repo_root, rel_path):
             missing.append(rel_path)
     return sorted(missing)
+
+
+def _bootstrap_anchor_missing(repo_root: str, rel_path: str) -> bool:
+    path = os.path.join(repo_root, rel_path)
+    if rel_path in REQUIRED_DIRECTORIES:
+        return not os.path.isdir(path)
+    return not os.path.isfile(path)
 
 
 def _check_parseability(repo_root: str) -> list[str]:
     malformed: list[str] = []
     for rel_path in REQUIRED_SCHEMA_FILES:
-        path = os.path.join(repo_root, rel_path)
-        try:
-            with open(path, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-            if not isinstance(data, dict):
-                malformed.append(f"{rel_path}: schema_root_not_mapping")
-        except (OSError, json.JSONDecodeError) as exc:
-            malformed.append(f"{rel_path}: {exc}")
+        malformed.extend(_schema_parseability_errors(repo_root, rel_path))
 
     for rel_path in REQUIRED_CONFIG_FILES:
-        path = os.path.join(repo_root, rel_path)
-        try:
-            with open(path, "r", encoding="utf-8") as fh:
-                data = yaml.safe_load(fh)
-            if not isinstance(data, dict):
-                malformed.append(f"{rel_path}: config_root_not_mapping")
-        except (OSError, yaml.YAMLError) as exc:
-            malformed.append(f"{rel_path}: {exc}")
+        malformed.extend(_config_parseability_errors(repo_root, rel_path))
 
     return sorted(malformed)
+
+
+def _schema_parseability_errors(repo_root: str, rel_path: str) -> list[str]:
+    try:
+        data = _load_json_anchor(repo_root, rel_path)
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"{rel_path}: {exc}"]
+    if not isinstance(data, dict):
+        return [f"{rel_path}: schema_root_not_mapping"]
+    return []
+
+
+def _config_parseability_errors(repo_root: str, rel_path: str) -> list[str]:
+    try:
+        data = _load_yaml_anchor(repo_root, rel_path)
+    except (OSError, yaml.YAMLError) as exc:
+        return [f"{rel_path}: {exc}"]
+    if not isinstance(data, dict):
+        return [f"{rel_path}: config_root_not_mapping"]
+    return []
+
+
+def _load_json_anchor(repo_root: str, rel_path: str) -> Any:
+    with open(os.path.join(repo_root, rel_path), "r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def _load_yaml_anchor(repo_root: str, rel_path: str) -> Any:
+    with open(os.path.join(repo_root, rel_path), "r", encoding="utf-8") as fh:
+        return yaml.safe_load(fh)
 
 
 def _compute_changed_files(args: argparse.Namespace, repo_root: str) -> list[str]:
@@ -363,88 +382,125 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
-    args = build_parser().parse_args()
-    repo_root = os.path.abspath(args.repo_root)
+def parse_horoji_check_args() -> argparse.Namespace:
+    return build_parser().parse_args()
 
-    provenance_args = [
+
+def resolve_provenance_args(repo_root: str) -> list[str]:
+    return [
         "--generated-at",
         _resolve_deterministic_generated_at(repo_root),
         "--input-commit",
         _resolve_deterministic_input_commit(repo_root),
     ]
 
-    stage_results: list[dict[str, Any]] = []
-    changed_files: list[str] = []
-    primary_changed_files: list[str] = []
-    affected_artifacts: list[str] = []
 
+def main() -> None:
+    args = parse_horoji_check_args()
+    repo_root = os.path.abspath(args.repo_root)
     try:
-        missing = _check_bootstrap_presence(repo_root)
-        if missing:
-            raise StageFailure("bootstrap_presence", "missing_bootstrap_anchor", missing)
-        stage_results.append(emit_stage("bootstrap_presence", "PASS", "required_bootstrap_present"))
-
-        malformed = _check_parseability(repo_root)
-        if malformed:
-            raise StageFailure("bootstrap_parseability", "malformed_bootstrap_anchor", malformed)
-        stage_results.append(emit_stage("bootstrap_parseability", "PASS", "bootstrap_parseable"))
-
-        changed_files = _compute_changed_files(args, repo_root)
-        primary_changed_files = _primary_changed_files(changed_files)
-        if not primary_changed_files:
-            raise StageFailure("changed_files", "primary_changed_files_unavailable", changed_files)
-        stage_results.append(
-            emit_stage("changed_files", "PASS", "changed_files_resolved", [f"count={len(changed_files)}", *changed_files])
-        )
-
-        invalidation_result, affected_artifacts = _run_invalidation(repo_root, primary_changed_files)
-        stage_results.append(
-            emit_stage(
-                "invalidation",
-                "PASS",
-                str(invalidation_result.get("scope", "scope_unknown")),
-                [
-                    f"affected_artifacts={','.join(affected_artifacts)}",
-                    f"reason={','.join(invalidation_result.get('reason', []))}",
-                ],
-            )
-        )
-
-        invoked = _regenerate(repo_root, affected_artifacts, primary_changed_files, provenance_args)
-        stage_results.append(
-            emit_stage("regeneration", "PASS", "required_regeneration_completed", invoked)
-        )
-
-        auth_reasons = _run_stage_validators(
-            repo_root,
-            ["validate-contracts", "validate-invariants", "validate-ownership"],
-            "validate_authoritative",
-        )
-        stage_results.append(emit_stage("validate_authoritative", "PASS", "authoritative_valid", auth_reasons))
-
-        derived_reasons = _run_stage_validators(repo_root, ["validate-provenance"], "validate_derived")
-        stage_results.append(emit_stage("validate_derived", "PASS", "derived_valid", derived_reasons))
-
-        invariant_reasons = _run_stage_validators(
-            repo_root,
-            ["validate-scheduler_non_blocking", "validate-all"],
-            "validate_repository_invariants",
-        )
-        stage_results.append(
-            emit_stage("validate_repository_invariants", "PASS", "invariants_valid", invariant_reasons)
-        )
-
-        stale_details = _check_stale_derived(repo_root, args.derived_policy)
-        stage_results.append(emit_stage("stale_artifact_check", "PASS", "stale_check_passed", stale_details))
-
-        stage_results.append(emit_stage("result", "PASS", "horoji_ci_check_passed", STAGE_ORDER))
-        sys.exit(0)
-
+        run_horoji_check(args, repo_root)
     except StageFailure as exc:
-        stage_results.append(emit_stage(exc.stage, "FAIL", exc.reason, exc.details))
-        stage_results.append(emit_stage("result", "FAIL", "horoji_ci_check_failed", STAGE_ORDER))
+        emit_failure_result(exc)
         sys.exit(1)
+
+
+def run_horoji_check(args: argparse.Namespace, repo_root: str) -> None:
+    provenance_args = resolve_provenance_args(repo_root)
+    emit_bootstrap_stages(repo_root)
+    changed_files, primary_changed_files = resolve_changed_file_inputs(args, repo_root)
+    affected_artifacts = emit_invalidation_stage(repo_root, primary_changed_files)
+    emit_regeneration_stage(repo_root, affected_artifacts, primary_changed_files, provenance_args)
+    emit_validation_stages(repo_root)
+    emit_stale_artifact_stage(repo_root, args.derived_policy)
+    emit_success_result()
+    sys.exit(0)
+
+
+def emit_bootstrap_stages(repo_root: str) -> None:
+    missing = _check_bootstrap_presence(repo_root)
+    if missing:
+        raise StageFailure("bootstrap_presence", "missing_bootstrap_anchor", missing)
+    emit_stage("bootstrap_presence", "PASS", "required_bootstrap_present")
+
+    malformed = _check_parseability(repo_root)
+    if malformed:
+        raise StageFailure("bootstrap_parseability", "malformed_bootstrap_anchor", malformed)
+    emit_stage("bootstrap_parseability", "PASS", "bootstrap_parseable")
+
+
+def resolve_changed_file_inputs(
+    args: argparse.Namespace,
+    repo_root: str,
+) -> tuple[list[str], list[str]]:
+    changed_files = _compute_changed_files(args, repo_root)
+    primary_changed_files = _primary_changed_files(changed_files)
+    if not primary_changed_files:
+        raise StageFailure("changed_files", "primary_changed_files_unavailable", changed_files)
+    emit_stage(
+        "changed_files",
+        "PASS",
+        "changed_files_resolved",
+        [f"count={len(changed_files)}", *changed_files],
+    )
+    return changed_files, primary_changed_files
+
+
+def emit_invalidation_stage(repo_root: str, primary_changed_files: list[str]) -> list[str]:
+    invalidation_result, affected_artifacts = _run_invalidation(repo_root, primary_changed_files)
+    emit_stage(
+        "invalidation",
+        "PASS",
+        str(invalidation_result.get("scope", "scope_unknown")),
+        [
+            f"affected_artifacts={','.join(affected_artifacts)}",
+            f"reason={','.join(invalidation_result.get('reason', []))}",
+        ],
+    )
+    return affected_artifacts
+
+
+def emit_regeneration_stage(
+    repo_root: str,
+    affected_artifacts: list[str],
+    primary_changed_files: list[str],
+    provenance_args: list[str],
+) -> None:
+    invoked = _regenerate(repo_root, affected_artifacts, primary_changed_files, provenance_args)
+    emit_stage("regeneration", "PASS", "required_regeneration_completed", invoked)
+
+
+def emit_validation_stages(repo_root: str) -> None:
+    auth_reasons = _run_stage_validators(
+        repo_root,
+        ["validate-contracts", "validate-invariants", "validate-ownership"],
+        "validate_authoritative",
+    )
+    emit_stage("validate_authoritative", "PASS", "authoritative_valid", auth_reasons)
+
+    derived_reasons = _run_stage_validators(repo_root, ["validate-provenance"], "validate_derived")
+    emit_stage("validate_derived", "PASS", "derived_valid", derived_reasons)
+
+    invariant_reasons = _run_stage_validators(
+        repo_root,
+        ["validate-scheduler_non_blocking", "validate-all"],
+        "validate_repository_invariants",
+    )
+    emit_stage("validate_repository_invariants", "PASS", "invariants_valid", invariant_reasons)
+
+
+def emit_stale_artifact_stage(repo_root: str, derived_policy: str) -> None:
+    stale_details = _check_stale_derived(repo_root, derived_policy)
+    emit_stage("stale_artifact_check", "PASS", "stale_check_passed", stale_details)
+
+
+def emit_success_result() -> None:
+    emit_stage("result", "PASS", "horoji_ci_check_passed", STAGE_ORDER)
+
+
+def emit_failure_result(exc: StageFailure) -> None:
+    emit_stage(exc.stage, "FAIL", exc.reason, exc.details)
+    emit_stage("result", "FAIL", "horoji_ci_check_failed", STAGE_ORDER)
 
 
 if __name__ == "__main__":

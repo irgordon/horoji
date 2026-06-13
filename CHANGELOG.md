@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed — Validator and CI Readability
+
+- Split oversized validator and `horoji-check` orchestration flows into smaller
+  named helpers without changing validator semantics, CLI behavior, or derived
+  artifact policy.
+
 ### Changed — Validator Exception Boundaries
 
 - Replaced broad validator exception handling with narrow expected file,

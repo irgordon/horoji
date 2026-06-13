@@ -41,9 +41,11 @@ def yaml_files_recursive(directory: str) -> list[str]:
         return result
     for root, dirs, files in os.walk(directory):
         dirs.sort()
-        for name in sorted(files):
-            if name.endswith(".yaml"):
-                result.append(os.path.join(root, name))
+        result.extend(
+            os.path.join(root, name)
+            for name in sorted(files)
+            if name.endswith(".yaml")
+        )
     return result
 
 
@@ -94,59 +96,127 @@ def validate_against_schema(data: Any, schema: dict[str, Any], path: str = "$") 
     if not isinstance(data, dict):
         return errors
 
-    required = schema.get("required", [])
-    for field in required:
-        if field not in data:
-            errors.append(f"{path}: missing required field '{field}'")
-
-    additional_properties = schema.get("additionalProperties", True)
     properties = schema.get("properties", {})
-    if additional_properties is False:
-        for key in sorted(data):
-            if key not in properties:
-                errors.append(f"{path}: unknown field '{key}'")
-
-    for field, field_schema in properties.items():
-        if field not in data:
-            continue
-        value = data[field]
-        field_path = f"{path}.{field}"
-
-        field_type = field_schema.get("type")
-        if field_type and not _is_type(value, field_type):
-            errors.append(
-                f"{field_path}: expected type '{field_type}', got '{type(value).__name__}'"
-            )
-            continue
-
-        if "enum" in field_schema and value not in field_schema["enum"]:
-            errors.append(
-                f"{field_path}: value '{value}' not in enum {field_schema['enum']}"
-            )
-
-        if field_type == "string" and "minLength" in field_schema:
-            if isinstance(value, str) and len(value) < field_schema["minLength"]:
-                errors.append(
-                    f"{field_path}: string length {len(value)} is less than minimum {field_schema['minLength']}"
-                )
-
-        if field_type == "array":
-            if isinstance(value, list):
-                item_schema = field_schema.get("items", {})
-                item_type = item_schema.get("type")
-                for idx, item in enumerate(value):
-                    item_path = f"{field_path}[{idx}]"
-                    if item_type and not _is_type(item, item_type):
-                        errors.append(
-                            f"{item_path}: expected type '{item_type}', got '{type(item).__name__}'"
-                        )
-                    if isinstance(item_schema, dict) and item_schema.get("type") == "object":
-                        errors.extend(validate_against_schema(item, item_schema, item_path))
-
-        if field_type == "object" and isinstance(value, dict):
-            errors.extend(validate_against_schema(value, field_schema, field_path))
+    errors.extend(_validate_required_fields(data, schema, path))
+    errors.extend(_validate_unknown_fields(data, properties, schema, path))
+    errors.extend(_validate_declared_properties(data, properties, path))
 
     return errors
+
+
+def _validate_required_fields(data: dict[str, Any], schema: dict[str, Any], path: str) -> list[str]:
+    return [
+        f"{path}: missing required field '{field}'"
+        for field in schema.get("required", [])
+        if field not in data
+    ]
+
+
+def _validate_unknown_fields(
+    data: dict[str, Any],
+    properties: dict[str, Any],
+    schema: dict[str, Any],
+    path: str,
+) -> list[str]:
+    if schema.get("additionalProperties", True) is not False:
+        return []
+    return [
+        f"{path}: unknown field '{key}'"
+        for key in sorted(data)
+        if key not in properties
+    ]
+
+
+def _validate_declared_properties(
+    data: dict[str, Any],
+    properties: dict[str, Any],
+    path: str,
+) -> list[str]:
+    errors: list[str] = []
+    for field, field_schema in properties.items():
+        if field in data:
+            errors.extend(_validate_property_value(data[field], field_schema, f"{path}.{field}"))
+    return errors
+
+
+def _validate_property_value(value: Any, field_schema: dict[str, Any], field_path: str) -> list[str]:
+    field_type = field_schema.get("type")
+    if field_type and not _is_type(value, field_type):
+        return [
+            f"{field_path}: expected type '{field_type}', got '{type(value).__name__}'"
+        ]
+
+    errors: list[str] = []
+    errors.extend(_validate_enum_value(value, field_schema, field_path))
+    errors.extend(_validate_string_length(value, field_type, field_schema, field_path))
+    errors.extend(_validate_array_items(value, field_type, field_schema, field_path))
+    errors.extend(_validate_object_value(value, field_type, field_schema, field_path))
+    return errors
+
+
+def _validate_enum_value(value: Any, field_schema: dict[str, Any], field_path: str) -> list[str]:
+    if "enum" not in field_schema or value in field_schema["enum"]:
+        return []
+    return [f"{field_path}: value '{value}' not in enum {field_schema['enum']}"]
+
+
+def _validate_string_length(
+    value: Any,
+    field_type: str | None,
+    field_schema: dict[str, Any],
+    field_path: str,
+) -> list[str]:
+    if field_type != "string" or "minLength" not in field_schema:
+        return []
+    if not isinstance(value, str) or len(value) >= field_schema["minLength"]:
+        return []
+    return [
+        f"{field_path}: string length {len(value)} is less than minimum {field_schema['minLength']}"
+    ]
+
+
+def _validate_array_items(
+    value: Any,
+    field_type: str | None,
+    field_schema: dict[str, Any],
+    field_path: str,
+) -> list[str]:
+    if field_type != "array" or not isinstance(value, list):
+        return []
+
+    errors: list[str] = []
+    item_schema = field_schema.get("items", {})
+    item_type = item_schema.get("type")
+    for idx, item in enumerate(value):
+        errors.extend(_validate_array_item(item, item_schema, item_type, f"{field_path}[{idx}]"))
+    return errors
+
+
+def _validate_array_item(
+    item: Any,
+    item_schema: dict[str, Any],
+    item_type: str | None,
+    item_path: str,
+) -> list[str]:
+    errors: list[str] = []
+    if item_type and not _is_type(item, item_type):
+        errors.append(
+            f"{item_path}: expected type '{item_type}', got '{type(item).__name__}'"
+        )
+    if isinstance(item_schema, dict) and item_schema.get("type") == "object":
+        errors.extend(validate_against_schema(item, item_schema, item_path))
+    return errors
+
+
+def _validate_object_value(
+    value: Any,
+    field_type: str | None,
+    field_schema: dict[str, Any],
+    field_path: str,
+) -> list[str]:
+    if field_type == "object" and isinstance(value, dict):
+        return validate_against_schema(value, field_schema, field_path)
+    return []
 
 
 def emit_yaml(data: dict[str, Any], stream: Any = sys.stdout) -> None:
