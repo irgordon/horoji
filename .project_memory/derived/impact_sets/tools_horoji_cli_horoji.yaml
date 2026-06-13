@@ -1,0 +1,10 @@
+file: tools/horoji/cli/horoji
+impacted_subsystems:
+- horoji_cli
+provenance:
+  artifact_type: impact_set
+  generated_at: '2026-06-13T11:54:24-04:00'
+  generator: horoji-impact
+  input_commit: dcbcfa16e688d71e7ad276d42610b3e127988c7d
+  schema_version: 1.0.0
+  trust_level: derived

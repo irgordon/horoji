@@ -1,4 +1,10 @@
-# Horoji
+<h1 align="center">Horoji</h1>
+
+<p align="center">
+  <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-blue">
+  <img alt="YAML metadata" src="https://img.shields.io/badge/metadata-YAML-green">
+  <img alt="GitHub Actions" src="https://img.shields.io/badge/ci-GitHub%20Actions-black">
+</p>
 
 Horoji is a repository-resident project memory subsystem. It exposes
 authoritative architectural facts, machine-readable invariants, ownership
@@ -111,10 +117,22 @@ python tools/horoji/cli/horoji-check \
   --derived-policy committed
 ```
 
+After committing a change, run the same committed-derived policy from the last
+commit:
+
+```bash
+python tools/horoji/cli/horoji-check \
+  --repo-root . \
+  --auto-diff \
+  --derived-policy committed
+```
+
 Run a public CLI query example:
 
 ```bash
 python tools/horoji/cli/horoji --repo-root . get-contract horoji_cli
+python tools/horoji/cli/horoji --repo-root . get-context horoji_cli
+python tools/horoji/cli/horoji --repo-root . get-owner tools/horoji/cli/horoji
 ```
 
 ## Authoritative vs Derived Artifacts
@@ -221,6 +239,15 @@ With `--derived-policy committed`, the check fails if `.project_memory/derived`
 has uncommitted changes after regeneration. This is the repository policy used
 to ensure checked-in derived artifacts match current authoritative inputs and
 generator output.
+
+If validation fails, read the structured `reason` and `details` fields first.
+Repair the repository artifact or command input named there, then rerun the same
+command. When committed derived policy reports stale artifacts, rerun
+`horoji-check` for the changed primary files and commit the generated
+`.project_memory/derived/**` changes if they are expected.
+
+Do not manually edit derived artifacts as a substitute for regeneration. Do not
+treat derived artifacts as authoritative.
 
 ## Operator Command Matrix
 

@@ -362,8 +362,18 @@ def _check_stale_derived(repo_root: str, policy: str) -> list[str]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run deterministic Horoji CI enforcement checks")
-    parser.add_argument("--repo-root", default=REPO_ROOT, help="Repository root path")
+    parser = argparse.ArgumentParser(
+        description="Run deterministic Horoji CI enforcement orchestration.",
+        epilog=(
+            "Examples:\n"
+            "  horoji-check --repo-root . --changed-file README.md --derived-policy committed\n"
+            "  horoji-check --repo-root . --auto-diff --derived-policy committed\n\n"
+            "With --derived-policy committed, validation fails if approved "
+            "regeneration leaves uncommitted files under .project_memory/derived."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--repo-root", default=REPO_ROOT, help="Horoji repository root path")
     parser.add_argument("--changed-file", action="append", default=[], help="Changed file path (repeatable)")
     parser.add_argument("--changed-files-file", help="File containing changed paths (one per line)")
     parser.add_argument("--base-sha", help="Base commit SHA for changed file computation")
@@ -377,7 +387,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--derived-policy",
         choices=["committed", "non_committed"],
         default="committed",
-        help="Stale-check policy for derived artifacts",
+        help=(
+            "Derived artifact policy: committed requires a clean .project_memory/derived "
+            "tree after regeneration; non_committed skips the clean-tree requirement"
+        ),
     )
     return parser
 

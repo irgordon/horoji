@@ -8,6 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed — Production Usability
+
+- Improved public CLI and `horoji-check` help text with clearer purposes,
+  argument descriptions, and examples while keeping the public command surface
+  unchanged.
+- Added a clear invalid repository-root error for the public CLI.
+- Expanded README operator examples for validation, auto-diff enforcement, and
+  public query commands.
+
 ### Changed — Roadmap Compression
 
 - Compressed the remaining pre-v1.0.0 roadmap into a short release-candidate

@@ -20,6 +20,18 @@ def _repo_root(override: str | None) -> str:
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 
+def _require_horoji_repo_root(repo_root: str) -> None:
+    """Fail clearly when a caller points the CLI outside a Horoji repository."""
+    memory_root = os.path.join(repo_root, ".project_memory")
+    if os.path.isdir(memory_root):
+        return
+    _emit_error(
+        "invalid_repo_root",
+        f"repository root does not contain .project_memory: {repo_root}; "
+        "run from the repository root or pass --repo-root <path>",
+    )
+
+
 def _safe_dump(payload: dict[str, Any], stream: Any = sys.stdout) -> None:
     """Emit deterministic YAML output."""
     yaml.safe_dump(payload, stream, sort_keys=True)
@@ -330,41 +342,119 @@ def cmd_log_agent_execution(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     """Build CLI parser."""
-    parser = argparse.ArgumentParser(description="Horoji deterministic CLI")
-    parser.add_argument("--repo-root", help="Repository root path override")
-
+    parser = build_root_parser()
+    add_root_arguments(parser)
     subparsers = parser.add_subparsers(dest="command", required=True)
-
-    get_contract = subparsers.add_parser("get-contract", help="Get subsystem contract")
-    get_contract.add_argument("subsystem")
-
-    get_invariants = subparsers.add_parser("get-invariants", help="Get subsystem invariants")
-    get_invariants.add_argument("subsystem")
-
-    get_owner = subparsers.add_parser("get-owner", help="Get file owner by ownership map")
-    get_owner.add_argument("file_path")
-
-    get_impact_set = subparsers.add_parser("get-impact-set", help="Get derived impact set for file")
-    get_impact_set.add_argument("file_path")
-
-    get_context = subparsers.add_parser("get-context", help="Get structured subsystem context")
-    get_context.add_argument("subsystem")
-
-    subparsers.add_parser("validate", help="Run deterministic repository validation")
-
-    log_agent = subparsers.add_parser(
-        "log-agent-execution",
-        help="Emit deterministic structured agent execution log",
-    )
-    log_agent.add_argument("--agent-name", required=True)
-    log_agent.add_argument("--agent-version", required=True)
-    log_agent.add_argument("--timestamp", required=True)
-    log_agent.add_argument("--subsystem", required=True)
-    log_agent.add_argument("--action", required=True)
-    log_agent.add_argument("--status", required=True)
-    log_agent.add_argument("--detail", action="append", default=[])
-
+    add_query_parsers(subparsers)
+    add_validation_parser(subparsers)
+    add_log_agent_parser(subparsers)
     return parser
+
+
+def build_root_parser() -> argparse.ArgumentParser:
+    return argparse.ArgumentParser(
+        description="Query deterministic Horoji repository memory.",
+        epilog=(
+            "Examples:\n"
+            "  horoji --repo-root . get-contract horoji_cli\n"
+            "  horoji --repo-root . get-context horoji_cli\n"
+            "  horoji --repo-root . validate\n\n"
+            "Public commands are intentionally small. Regeneration and "
+            "invalidation are internal horoji-check orchestration surfaces, "
+            "not public horoji commands."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+
+def add_query_parsers(subparsers: argparse._SubParsersAction) -> None:
+    add_get_contract_parser(subparsers)
+    add_get_invariants_parser(subparsers)
+    add_get_owner_parser(subparsers)
+    add_get_impact_set_parser(subparsers)
+    add_get_context_parser(subparsers)
+
+
+def add_get_contract_parser(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser(
+        "get-contract",
+        help="Read one authoritative subsystem contract",
+        description="Read one authoritative subsystem contract as deterministic YAML.",
+    )
+    parser.add_argument("subsystem", help="Subsystem identifier, for example: horoji_cli")
+
+
+def add_get_invariants_parser(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser(
+        "get-invariants",
+        help="Read authoritative invariants for a subsystem",
+        description="Read authoritative invariant records for a subsystem.",
+    )
+    parser.add_argument("subsystem", help="Subsystem identifier, for example: horoji_validators")
+
+
+def add_get_owner_parser(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser(
+        "get-owner",
+        help="Resolve a repository path to an authoritative owner",
+        description="Resolve a repository-relative path using authoritative ownership metadata.",
+    )
+    parser.add_argument("file_path", help="Repository-relative path, for example: tools/horoji/cli/horoji")
+
+
+def add_get_impact_set_parser(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser(
+        "get-impact-set",
+        help="Read the committed derived impact set for a file",
+        description="Read a committed derived impact-set artifact without treating it as authoritative.",
+    )
+    parser.add_argument("file_path", help="Repository-relative path, for example: README.md")
+
+
+def add_get_context_parser(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser(
+        "get-context",
+        help="Read combined authoritative and derived context",
+        description=(
+            "Read deterministic subsystem context. Authoritative records remain "
+            "separate from derived projections in the output."
+        ),
+    )
+    parser.add_argument("subsystem", help="Subsystem identifier, for example: horoji_cli")
+
+
+def add_validation_parser(subparsers: argparse._SubParsersAction) -> None:
+    subparsers.add_parser(
+        "validate",
+        help="Run repository validators through validate-all",
+        description="Run deterministic repository validation through tools/horoji/validators/validate-all.",
+    )
+
+
+def add_log_agent_parser(subparsers: argparse._SubParsersAction) -> None:
+    parser = subparsers.add_parser(
+        "log-agent-execution",
+        help="Emit a deterministic structured agent execution log",
+        description="Emit machine-readable agent execution data; this is not authoritative repository state.",
+    )
+    add_log_agent_arguments(parser)
+
+
+def add_log_agent_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--agent-name", required=True)
+    parser.add_argument("--agent-version", required=True)
+    parser.add_argument("--timestamp", required=True)
+    parser.add_argument("--subsystem", required=True)
+    parser.add_argument("--action", required=True)
+    parser.add_argument("--status", required=True)
+    parser.add_argument("--detail", action="append", default=[])
+
+
+def add_root_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--repo-root",
+        help="Horoji repository root; defaults to the repository containing this script",
+    )
 
 
 def main() -> None:
@@ -372,6 +462,7 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
     repo_root = _repo_root(args.repo_root)
+    _require_horoji_repo_root(repo_root)
 
     if args.command == "get-contract":
         cmd_get_contract(repo_root, args.subsystem)
