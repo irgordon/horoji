@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — v0.5.0-rc.1 Release Candidate
+
+- Added the `docs/releases/v0.5.0-rc.1-Decision.md` release-candidate
+  decision record for v1.0.0 review.
+- Documented RC freeze boundaries for the public CLI surface, governed metadata
+  schema surfaces, release validation gate, trust boundary, ownership,
+  determinism, repository-locality, and committed derived policy.
+- Recorded release-candidate validation evidence without adding runtime
+  behavior or claiming final production readiness.
+
 ### Changed — Release Gate and CI Finalization
 
 - Added `docs/RELEASE.md` defining the local and CI release gate, committed
