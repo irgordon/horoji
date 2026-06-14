@@ -1,0 +1,9 @@
+file: docs/assets/horoji-cli-screen.png
+impacted_subsystems: []
+provenance:
+  artifact_type: impact_set
+  generated_at: '2026-06-13T14:37:51-04:00'
+  generator: horoji-impact
+  input_commit: d0c82fd62b93b7931dcc70a88030d734bcfebc5c
+  schema_version: 1.0.0
+  trust_level: derived
