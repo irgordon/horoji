@@ -65,6 +65,8 @@ Horoji is not the right fit when you need:
 * automatic architecture decisions without reviewed repository metadata
 
 For a guided overview, start with the [Horoji Wiki](docs/wiki/introduction.md).
+For adopting Horoji in another repository, see
+[Onboarding Another Repository](docs/wiki/page-9-onboarding-another-repo.md).
 For the post-v1 adoption plan, see the [roadmap](docs/ROADMAP.md).
 
 ## What Horoji Does

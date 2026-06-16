@@ -29,7 +29,8 @@ If you have one hour, read these pages in order:
 4. [First-Hour Walkthrough](page-5-first-hour-walkthrough.md)
 5. [Troubleshooting](page-7-troubleshooting.md)
 
-Then use the diagrams and release page when you need the bigger picture.
+Then use the diagrams, release page, and onboarding page when you need the
+bigger picture.
 
 ## Pages
 
@@ -41,6 +42,7 @@ Then use the diagrams and release page when you need the bigger picture.
 - [Page 6: What to Edit](page-6-what-to-edit.md)
 - [Page 7: Troubleshooting](page-7-troubleshooting.md)
 - [Page 8: Release and CI Flow](page-8-release-and-ci-flow.md)
+- [Page 9: Onboarding Another Repository](page-9-onboarding-another-repo.md)
 
 ## What Horoji Is
 

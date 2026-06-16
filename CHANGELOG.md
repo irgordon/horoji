@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Repository Onboarding Guide
+
+- Added a wiki page that explains how to adopt Horoji in another repository
+  through small, reviewable metadata and validation steps.
+- Linked the onboarding guide from the wiki landing page and README without
+  adding generators, installers, public CLI commands, or runtime behavior.
+
 ### Added — Adoption-Focused README Guidance
 
 - Added README guidance explaining when Horoji is a good fit, when it is not,

@@ -1,0 +1,9 @@
+file: docs/wiki/page-9-onboarding-another-repo.md
+impacted_subsystems: []
+provenance:
+  artifact_type: impact_set
+  generated_at: '2026-06-15T20:27:57-04:00'
+  generator: horoji-impact
+  input_commit: 4e01084340e1c81f4bef952ecaf236d64d90852e
+  schema_version: 1.0.0
+  trust_level: derived
