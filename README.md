@@ -41,6 +41,32 @@ Horoji gives the repository a local memory layer for those answers.
 
 It is designed for teams that want AI-assisted development without letting agents guess how the project works.
 
+## When to Use Horoji
+
+Horoji is a good fit when a repository needs:
+
+* reviewed project facts that agents and developers can query
+* explicit ownership for files, tools, and governance surfaces
+* deterministic checks that generated project memory is current
+* CI enforcement for contracts, invariants, provenance, and derived artifacts
+* a small repository-local CLI instead of a hosted service
+
+Use Horoji when the repository itself should explain its boundaries before
+people or agents make changes.
+
+## When Not to Use Horoji
+
+Horoji is not the right fit when you need:
+
+* a chatbot or natural-language reasoning system
+* a replacement for source files, design docs, or code review
+* a remote knowledge base or external search service
+* deployment approval, release approval, or merge authority
+* automatic architecture decisions without reviewed repository metadata
+
+For a guided overview, start with the [Horoji Wiki](docs/wiki/introduction.md).
+For the post-v1 adoption plan, see the [roadmap](docs/ROADMAP.md).
+
 ## What Horoji Does
 
 Horoji can:

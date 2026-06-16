@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Adoption-Focused README Guidance
+
+- Added README guidance explaining when Horoji is a good fit, when it is not,
+  and where new users should go next.
+- Kept the guidance documentation-only without changing runtime behavior or the
+  public CLI surface.
+
 ### Added — v1.1.0 Adoption Roadmap
 
 - Added a short v1.1.0 adoption and usability roadmap tying issue #9 to
