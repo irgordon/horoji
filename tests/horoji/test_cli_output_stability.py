@@ -48,8 +48,10 @@ def load_stderr_yaml(result: subprocess.CompletedProcess) -> dict:
 def test_get_contract_output_shape_is_stable():
     payload = load_stdout_yaml(run_public_cli("get-contract", "horoji_cli"))
 
-    assert sorted(payload) == ["contract", "subsystem"]
+    assert sorted(payload) == ["contract", "found", "message", "subsystem"]
     assert payload["subsystem"] == "horoji_cli"
+    assert payload["found"] is True
+    assert payload["message"] == "contract found for subsystem: horoji_cli"
     assert sorted(payload["contract"]) == [
         "allowed_dependencies",
         "exports",
@@ -72,10 +74,12 @@ def test_get_contract_output_shape_is_stable():
 def test_get_owner_output_shape_is_stable():
     payload = load_stdout_yaml(run_public_cli("get-owner", "tools/horoji/cli/horoji"))
 
-    assert sorted(payload) == ["file", "matching_pattern", "owner"]
+    assert sorted(payload) == ["file", "found", "matching_pattern", "message", "owner"]
     assert payload == {
         "file": "tools/horoji/cli/horoji",
+        "found": True,
         "matching_pattern": "tools/horoji/cli/**",
+        "message": "owner found for path: tools/horoji/cli/horoji",
         "owner": "horoji_cli",
     }
 
@@ -109,6 +113,25 @@ def test_unsupported_command_error_shape_is_stable():
     assert "invalid choice: 'regenerate'" in result.stderr
     assert "get-contract" in result.stderr
     assert "log-agent-execution" in result.stderr
+
+
+def test_missing_query_results_are_repairable():
+    contract = load_stdout_yaml(run_public_cli("get-contract", "unknown_subsystem"))
+    owner = load_stdout_yaml(run_public_cli("get-owner", "unknown/path.py"))
+    impact_set = load_stdout_yaml(run_public_cli("get-impact-set", "unknown/path.py"))
+
+    assert contract["found"] is False
+    assert contract["message"] == "no contract found for subsystem: unknown_subsystem"
+    assert contract["contract"] == {}
+
+    assert owner["found"] is False
+    assert owner["message"] == "no owner found for path: unknown/path.py"
+    assert owner["owner"] is None
+    assert owner["matching_pattern"] is None
+
+    assert impact_set["found"] is False
+    assert impact_set["message"] == "no impact set found for path: unknown/path.py"
+    assert impact_set["impact_set"] == {}
 
 
 def test_invalid_repo_root_error_shape_is_stable(tmp_path: Path):

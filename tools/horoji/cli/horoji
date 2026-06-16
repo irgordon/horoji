@@ -37,6 +37,13 @@ def _safe_dump(payload: dict[str, Any], stream: Any = sys.stdout) -> None:
     yaml.safe_dump(payload, stream, sort_keys=True)
 
 
+def _query_message(found: bool, found_text: str, missing_text: str) -> str:
+    """Return a stable user-facing query message."""
+    if found:
+        return found_text
+    return missing_text
+
+
 def _emit_error(error_type: str, message: str) -> None:
     """Emit structured error and exit non-zero."""
     _safe_dump({"error": {"type": error_type, "message": message}}, stream=sys.stderr)
@@ -84,11 +91,23 @@ def cmd_get_contract(repo_root: str, subsystem: str) -> None:
     dirs = _memory_dirs(repo_root)
     path = os.path.join(dirs["contracts"], f"{subsystem}.yaml")
     contract = _load_yaml(path, required=False)
+    found = contract is not None
     if contract is None:
         contract = {}
     if not isinstance(contract, dict):
         _emit_error("invalid_structure", f"contract root must be a mapping: {path}")
-    _safe_dump({"subsystem": subsystem, "contract": contract})
+    _safe_dump(
+        {
+            "subsystem": subsystem,
+            "found": found,
+            "message": _query_message(
+                found,
+                f"contract found for subsystem: {subsystem}",
+                f"no contract found for subsystem: {subsystem}",
+            ),
+            "contract": contract,
+        }
+    )
 
 
 def cmd_get_invariants(repo_root: str, subsystem: str) -> None:
@@ -163,9 +182,16 @@ def _resolve_owner(repo_root: str, file_path: str) -> tuple[str | None, str | No
 def cmd_get_owner(repo_root: str, file_path: str) -> None:
     """Emit owner mapping for a file path."""
     owner, pattern = _resolve_owner(repo_root, file_path)
+    found = owner is not None
     _safe_dump(
         {
             "file": _normalize_path(file_path),
+            "found": found,
+            "message": _query_message(
+                found,
+                f"owner found for path: {_normalize_path(file_path)}",
+                f"no owner found for path: {_normalize_path(file_path)}",
+            ),
             "owner": owner,
             "matching_pattern": pattern,
         }
@@ -178,11 +204,23 @@ def cmd_get_impact_set(repo_root: str, file_path: str) -> None:
     normalized = _normalize_path(file_path)
     path = os.path.join(dirs["impact_sets"], f"{_safe_filename(normalized)}.yaml")
     data = _load_yaml(path, required=False)
+    found = data is not None
     if data is None:
         data = {}
     if not isinstance(data, dict):
         _emit_error("invalid_structure", f"impact set root must be a mapping: {path}")
-    _safe_dump({"file": normalized, "impact_set": data})
+    _safe_dump(
+        {
+            "file": normalized,
+            "found": found,
+            "message": _query_message(
+                found,
+                f"impact set found for path: {normalized}",
+                f"no impact set found for path: {normalized}",
+            ),
+            "impact_set": data,
+        }
+    )
 
 
 def _collect_subsystem_ownership(repo_root: str, subsystem: str) -> list[dict[str, Any]]:

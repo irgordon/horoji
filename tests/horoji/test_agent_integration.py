@@ -78,6 +78,7 @@ def test_get_contract_returns_structured_output():
     payload = yaml.safe_load(result.stdout)
     assert isinstance(payload, dict)
     assert payload.get("subsystem") == "horoji_cli"
+    assert payload.get("found") is True
     assert isinstance(payload.get("contract"), dict)
 
 
@@ -96,6 +97,7 @@ def test_get_owner_returns_structured_output():
     payload = yaml.safe_load(result.stdout)
     assert isinstance(payload, dict)
     assert payload.get("file") == "tools/horoji/cli/horoji"
+    assert payload.get("found") is True
     assert isinstance(payload.get("owner"), (str, type(None)))
     assert isinstance(payload.get("matching_pattern"), (str, type(None)))
 

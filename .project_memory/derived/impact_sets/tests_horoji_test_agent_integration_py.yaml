@@ -1,0 +1,9 @@
+file: tests/horoji/test_agent_integration.py
+impacted_subsystems: []
+provenance:
+  artifact_type: impact_set
+  generated_at: '2026-06-15T20:49:48-04:00'
+  generator: horoji-impact
+  input_commit: a219e6b341acc5e448c98ccf835e4b695d69f2e0
+  schema_version: 1.0.0
+  trust_level: derived

@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed — Public Query Ergonomics
+
+- Added deterministic `found` and `message` fields to public query outputs that
+  can return no matching contract, owner, or impact set.
+- Added regression coverage for repairable missing-query output while keeping
+  the public CLI command surface unchanged.
+
 ### Added — Public CLI Output Stability Tests
 
 - Added focused regression tests for public CLI output shape covering
