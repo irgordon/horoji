@@ -76,6 +76,10 @@ Before a release candidate or final release tag, the repository must include:
 The release decision record must name the validation commands that were run and
 their results.
 
+Use `docs/VERSIONING.md` to decide whether a release should be patch, minor,
+major, release-candidate, documentation-only, schema-impacting, or
+CLI-impacting.
+
 ## Boundaries
 
 Do not:

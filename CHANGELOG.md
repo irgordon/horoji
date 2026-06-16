@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Version Policy
+
+- Added `docs/VERSIONING.md` defining patch, minor, major, release-candidate,
+  documentation-only, schema-impacting, and CLI-impacting release expectations.
+- Linked the version policy from release documentation and the README
+  governance document list.
+
 ### Added — v1.1.0 Completion Note
 
 - Added a short completion note for the v1.1.0 adoption and usability track

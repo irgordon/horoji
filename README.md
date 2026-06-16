@@ -261,6 +261,7 @@ Primary governance and implementation documents:
 - `docs/ROADMAP.md`
 - `docs/RELEASE.md`
 - `docs/SCHEMAS.md`
+- `docs/VERSIONING.md`
 - `docs/TASK_00_HOROJI_BOOTSTRAP.md`
 - `docs/TASK_01_AUTHORITATIVE_SURFACES.md`
 - `docs/TASK_02_GENERATORS.md`

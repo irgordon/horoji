@@ -1,0 +1,9 @@
+file: docs/VERSIONING.md
+impacted_subsystems: []
+provenance:
+  artifact_type: impact_set
+  generated_at: '2026-06-15T21:36:07-04:00'
+  generator: horoji-impact
+  input_commit: 5c83a7f8e035114b7afa347cfa166b38c835ff34
+  schema_version: 1.0.0
+  trust_level: derived
