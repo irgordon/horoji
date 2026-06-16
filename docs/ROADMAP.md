@@ -291,17 +291,77 @@ Non-goals:
 
 ## Post-v1.0.0 Work
 
-These items are useful but not release blockers for v1.0.0:
+Horoji v1.0.0 is the production baseline. Post-v1 work should improve
+adoption, usability, and operator confidence without reopening the v1.0.0
+release gate.
 
-- deeper query ergonomics
-- expanded examples
+### v1.1.0 — Adoption and Usability
+
+Goal:
+
+Help more users understand, adopt, and operate Horoji after v1.0.0.
+
+Focus areas:
+
+- clearer adoption guidance
+- onboarding another repository
+- better troubleshooting examples
+- public CLI output stability
+- public query ergonomics
+- small documentation improvements based on real usage
+
+Main candidate issues:
+
+- #10 Add adoption-focused README section
+- #11 Add template for onboarding Horoji into another repository
+- #12 Improve troubleshooting examples for common failures
+- #13 Add public CLI output stability tests
+- #14 Improve Horoji public query ergonomics
+
+Acceptance criteria:
+
+- README helps users decide whether Horoji fits their repository
+- wiki has onboarding guidance for another repository
+- troubleshooting page includes concrete common-failure examples
+- public CLI outputs have focused stability tests
+- query ergonomics improve without unnecessary public command expansion
+- no public `horoji regenerate` command is added
+- no public `horoji invalidate` command is added
+- `validate-all` passes
+- full `pytest` passes
+- `horoji-check --auto-diff --derived-policy committed` passes
+
+Non-goals:
+
+- no new release gate for v1.0.0
+- no production-baseline revalidation requirement beyond normal checks
+- no public `horoji regenerate`
+- no public `horoji invalidate`
+- no natural-language query system
+- no daemon
+- no network service
+- no plugin system
+- no architecture expansion
+- no broad governance rewrite
+
+### Post-v1.1.0 Candidates
+
+These items are useful but not v1.1.0 blockers:
+
+- #15 Add a small example governance pack
+- #16 Add larger repository confidence checks
+- #17 Add release notes template
+- #18 Document Horoji version policy
+
+Later work may also include:
+
 - additional schema evolution work
-- performance improvements
+- performance improvements if larger repositories require them
 - broader invalidation confidence tests
 - advanced documentation validation
 - richer release automation
-- optional troubleshooting expansion
-- future security or boundary hardening that does not block the baseline
+- future security or boundary hardening that does not block the production
+  baseline
 
 ## Release Guardrails
 

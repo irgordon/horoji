@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — v1.1.0 Adoption Roadmap
+
+- Added a short v1.1.0 adoption and usability roadmap tying issue #9 to
+  selected post-v1 GitHub issues.
+- Separated main v1.1.0 candidates from later post-v1.1.0 candidates without
+  changing runtime behavior.
+
 ### Added — v1.0.0 Production Baseline
 
 - Added `docs/releases/v1.0.0-Decision.md` documenting acceptance of the
