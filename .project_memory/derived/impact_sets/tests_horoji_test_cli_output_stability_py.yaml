@@ -1,0 +1,9 @@
+file: tests/horoji/test_cli_output_stability.py
+impacted_subsystems: []
+provenance:
+  artifact_type: impact_set
+  generated_at: '2026-06-15T20:39:13-04:00'
+  generator: horoji-impact
+  input_commit: efcf31307b19742aa41bb4ef88c0a7d9c2e619f1
+  schema_version: 1.0.0
+  trust_level: derived

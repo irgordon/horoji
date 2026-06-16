@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Public CLI Output Stability Tests
+
+- Added focused regression tests for public CLI output shape covering
+  `get-contract`, `get-owner`, `get-context`, unsupported command errors, and
+  invalid repository-root errors.
+- Used direct assertions instead of large snapshots and kept public CLI
+  behavior unchanged.
+
 ### Added — Troubleshooting Examples
 
 - Expanded the troubleshooting wiki page with concrete common-failure examples
