@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — v1.1.0 Completion Note
+
+- Added a short completion note for the v1.1.0 adoption and usability track
+  before tagging.
+- Recorded that issues #10 through #14 are complete in repository
+  documentation while preserving the existing public CLI boundary.
+
 ### Changed — Public Query Ergonomics
 
 - Added deterministic `found` and `message` fields to public query outputs that
