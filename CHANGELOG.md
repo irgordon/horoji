@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Troubleshooting Examples
+
+- Expanded the troubleshooting wiki page with concrete common-failure examples
+  showing failed commands, likely meanings, repair paths, and what not to do.
+- Kept the update documentation-only without changing runtime behavior or
+  validation behavior.
+
 ### Added — Repository Onboarding Guide
 
 - Added a wiki page that explains how to adopt Horoji in another repository
